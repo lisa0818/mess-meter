@@ -17,7 +17,8 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.yourteam.messmeter"
     },
     "web": {
       "output": "server",
@@ -25,6 +26,10 @@
     },
     "plugins": [
       "expo-router",
+      
+      ["expo-image-picker", { "cameraPermission": "Mess Meter uses the camera so you can attach a photo of your plate." }],
+       "expo-notifications",
+
       [
         "expo-splash-screen",
         {
@@ -37,6 +42,16 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "10e76857-5946-46ff-a1b6-987d87ddfc01"
+      }
     }
   }
 }
