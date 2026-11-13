@@ -1,10 +1,24 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useState } from 'react';
+import {
+  Alert,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { PrimaryButton } from '../components/ui';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
-import { C, shadow } from '../lib/theme';
+import {
+  COLORS,
+  GLOBAL_STYLES,
+  RADIUS,
+  SHADOWS,
+  SPACING,
+  TYPOGRAPHY,
+} from '../theme/designSystem';
 
 export default function Join() {
   const [code, setCode] = useState('');
@@ -14,10 +28,15 @@ export default function Join() {
   const submit = async () => {
     if (!code.trim()) return;
     setBusy(true);
-    const { error } = await supabase.rpc('join_hostel', { code: code.trim() });
+    const { error } = await supabase.rpc('join_hostel', {
+      code: code.trim(),
+    });
     if (error) {
       setBusy(false);
-      Alert.alert('Invalid code', 'Ask your mess committee or warden for your hostel code.');
+      Alert.alert(
+        'Invalid code',
+        'Ask your mess committee or warden for your hostel code.'
+      );
       return;
     }
     await refreshProfile();
@@ -25,40 +44,101 @@ export default function Join() {
   };
 
   return (
-    <View style={{ flex: 1 }}>
-      <LinearGradient colors={[C.navy, C.navy2]} style={s.hero}>
-        <Text style={{ fontSize: 48 }}>🏠</Text>
-        <Text style={s.title}>Join your hostel</Text>
-        <Text style={s.sub}>Enter the code shared by your mess committee.</Text>
+    <View style={styles.container}>
+      <LinearGradient
+        colors={['#0F172A', '#1E293B']}
+        style={styles.heroSection}
+      >
+        <Text style={styles.heroIcon}>🏠</Text>
+        <Text style={styles.heroTitle}>Join your hostel</Text>
+        <Text style={styles.heroSubtitle}>
+          Enter the code shared by your mess committee.
+        </Text>
       </LinearGradient>
 
-      <View style={[s.card, shadow]}>
+      <View style={[GLOBAL_STYLES.card, SHADOWS.card, styles.card]}>
         <TextInput
-          style={s.input} placeholder="MESS01" placeholderTextColor="#9CA3AF"
-          autoCapitalize="characters" value={code} onChangeText={setCode}
+          style={styles.input}
+          placeholder="MESS01"
+          placeholderTextColor={COLORS.textMuted}
+          autoCapitalize="characters"
+          value={code}
+          onChangeText={setCode}
         />
-        <PrimaryButton label="Join hostel" onPress={submit} busy={busy} />
-        <Pressable style={{ padding: 16, alignItems: 'center' }} onPress={() => supabase.auth.signOut()}>
-          <Text style={{ color: C.muted }}>Sign out</Text>
+        <PrimaryButton
+          label="Join hostel"
+          onPress={submit}
+          busy={busy}
+          style={styles.submitBtn}
+        />
+        <Pressable
+          style={styles.signOutButton}
+          onPress={() => supabase.auth.signOut()}
+          accessibilityRole="button"
+        >
+          <Text style={styles.signOutText}>Sign out</Text>
         </Pressable>
       </View>
     </View>
   );
 }
 
-const s = StyleSheet.create({
-  hero: {
-    alignItems: 'center', paddingTop: 90, paddingBottom: 80, paddingHorizontal: 24,
-    borderBottomLeftRadius: 36, borderBottomRightRadius: 36,
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
   },
-  title: { color: '#fff', fontSize: 28, fontWeight: '800', marginTop: 8 },
-  sub: { color: C.onDark, marginTop: 4, textAlign: 'center' },
+  heroSection: {
+    alignItems: 'center',
+    paddingTop: 80,
+    paddingBottom: 70,
+    paddingHorizontal: SPACING.lg,
+    borderBottomLeftRadius: RADIUS.lg * 2,
+    borderBottomRightRadius: RADIUS.lg * 2,
+  },
+  heroIcon: {
+    fontSize: 48,
+    marginBottom: SPACING.xs,
+  },
+  heroTitle: {
+    ...TYPOGRAPHY.h1,
+    color: COLORS.textInverse,
+    fontSize: 28,
+  },
+  heroSubtitle: {
+    ...TYPOGRAPHY.body,
+    color: '#94A3B8',
+    marginTop: SPACING.xs,
+    textAlign: 'center',
+  },
   card: {
-    backgroundColor: C.card, borderRadius: 22, padding: 22, marginHorizontal: 20,
-    marginTop: -40, borderWidth: 1, borderColor: C.border,
+    padding: SPACING.lg,
+    marginHorizontal: SPACING.md,
+    marginTop: -SPACING.xl,
   },
   input: {
-    backgroundColor: '#F6F2EB', borderRadius: 12, padding: 16, fontSize: 22,
-    letterSpacing: 4, textAlign: 'center', color: C.text, marginBottom: 14,
+    backgroundColor: COLORS.surfaceSubtle,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    fontSize: 22,
+    letterSpacing: 4,
+    textAlign: 'center',
+    color: COLORS.textMain,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: SPACING.md,
+    fontWeight: '700',
+  },
+  submitBtn: {
+    minHeight: 52,
+  },
+  signOutButton: {
+    paddingVertical: SPACING.md,
+    alignItems: 'center',
+  },
+  signOutText: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textMuted,
+    fontWeight: '600',
   },
 });

@@ -1,17 +1,26 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
-  Alert, KeyboardAvoidingView,
+  Alert,
+  KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
-  Text, TextInput,
+  Text,
+  TextInput,
   View,
 } from 'react-native';
 import { PrimaryButton } from '../components/ui';
 import { supabase } from '../lib/supabase';
-import { C, shadow } from '../lib/theme';
+import {
+  COLORS,
+  GLOBAL_STYLES,
+  RADIUS,
+  SHADOWS,
+  SPACING,
+  TYPOGRAPHY,
+} from '../theme/designSystem';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -21,7 +30,10 @@ export default function Login() {
 
   const submit = async () => {
     if (!email.includes('@') || password.length < 6) {
-      Alert.alert('Check your details', 'Enter a valid email and a password of at least 6 characters.');
+      Alert.alert(
+        'Check your details',
+        'Enter a valid email and a password of at least 6 characters.'
+      );
       return;
     }
     setBusy(true);
@@ -35,58 +47,156 @@ export default function Login() {
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1 }}>
-        <LinearGradient colors={[C.navy, C.navy2]} style={s.hero}>
-          <View style={s.logo}><Text style={{ fontSize: 38 }}>🍛</Text></View>
-          <Text style={s.brand}>Mess Meter</Text>
-          <Text style={s.tag}>Rate every meal in 10 seconds.</Text>
+    <KeyboardAvoidingView
+      style={styles.keyboardContainer}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView
+        style={styles.container}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.scrollContent}
+      >
+        <LinearGradient
+          colors={['#0F172A', '#1E293B']}
+          style={styles.heroSection}
+        >
+          <View style={styles.logoCircle}>
+            <Text style={styles.logoEmoji}>🍛</Text>
+          </View>
+          <Text style={styles.brandTitle}>Mess Meter</Text>
+          <Text style={styles.brandSubtitle}>Rate every meal in 10 seconds.</Text>
         </LinearGradient>
 
-        <View style={[s.card, shadow]}>
-          <Text style={s.h}>{mode === 'in' ? 'Welcome back' : 'Create your account'}</Text>
+        <View style={[GLOBAL_STYLES.card, SHADOWS.card, styles.authCard]}>
+          <Text style={styles.authTitle}>
+            {mode === 'in' ? 'Welcome back' : 'Create your account'}
+          </Text>
+
           <TextInput
-            style={s.input} placeholder="Email" placeholderTextColor="#9CA3AF"
-            autoCapitalize="none" keyboardType="email-address"
-            value={email} onChangeText={setEmail}
+            style={styles.input}
+            placeholder="Student email"
+            placeholderTextColor={COLORS.textMuted}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            value={email}
+            onChangeText={setEmail}
           />
+
           <TextInput
-            style={s.input} placeholder="Password" placeholderTextColor="#9CA3AF"
-            secureTextEntry value={password} onChangeText={setPassword}
+            style={styles.input}
+            placeholder="Password (min 6 characters)"
+            placeholderTextColor={COLORS.textMuted}
+            secureTextEntry
+            value={password}
+            onChangeText={setPassword}
           />
-          <PrimaryButton label={mode === 'in' ? 'Sign in' : 'Create account'} onPress={submit} busy={busy} />
-          <Pressable onPress={() => setMode(mode === 'in' ? 'up' : 'in')} style={{ alignItems: 'center', paddingTop: 16 }}>
-            <Text style={{ color: C.primary, fontWeight: '700' }}>
-              {mode === 'in' ? 'New here? Create an account' : 'Have an account? Sign in'}
+
+          <PrimaryButton
+            label={mode === 'in' ? 'Sign in' : 'Create account'}
+            onPress={submit}
+            busy={busy}
+            style={styles.submitBtn}
+          />
+
+          <Pressable
+            onPress={() => setMode(mode === 'in' ? 'up' : 'in')}
+            style={styles.switchModeButton}
+            accessibilityRole="button"
+          >
+            <Text style={styles.switchModeText}>
+              {mode === 'in'
+                ? 'New here? Create an account'
+                : 'Have an account? Sign in'}
             </Text>
           </Pressable>
         </View>
 
-        <Text style={s.foot}>Anonymous ratings. Real change.</Text>
+        <Text style={styles.footerNote}>
+          Anonymous ratings. Real mess improvement.
+        </Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
-const s = StyleSheet.create({
-  hero: {
-    alignItems: 'center', paddingTop: 90, paddingBottom: 90,
-    borderBottomLeftRadius: 36, borderBottomRightRadius: 36,
+const styles = StyleSheet.create({
+  keyboardContainer: {
+    flex: 1,
+    backgroundColor: COLORS.background,
   },
-  logo: {
-    width: 84, height: 84, borderRadius: 42, backgroundColor: C.primary,
-    alignItems: 'center', justifyContent: 'center', marginBottom: 14,
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
   },
-  brand: { color: '#fff', fontSize: 32, fontWeight: '800' },
-  tag: { color: C.onDark, marginTop: 4 },
-  card: {
-    backgroundColor: C.card, borderRadius: 22, padding: 22, marginHorizontal: 20,
-    marginTop: -50, borderWidth: 1, borderColor: C.border,
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: SPACING.xl,
   },
-  h: { fontSize: 20, fontWeight: '800', color: C.text, marginBottom: 16 },
+  heroSection: {
+    alignItems: 'center',
+    paddingTop: 80,
+    paddingBottom: 80,
+    borderBottomLeftRadius: RADIUS.lg * 2,
+    borderBottomRightRadius: RADIUS.lg * 2,
+  },
+  logoCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.md,
+    ...SHADOWS.card,
+  },
+  logoEmoji: {
+    fontSize: 38,
+  },
+  brandTitle: {
+    ...TYPOGRAPHY.h1,
+    color: COLORS.textInverse,
+    fontSize: 30,
+  },
+  brandSubtitle: {
+    ...TYPOGRAPHY.body,
+    color: '#94A3B8',
+    marginTop: SPACING.xs,
+  },
+  authCard: {
+    padding: SPACING.lg,
+    marginHorizontal: SPACING.md,
+    marginTop: -SPACING.xxl,
+  },
+  authTitle: {
+    ...TYPOGRAPHY.h2,
+    marginBottom: SPACING.md,
+  },
   input: {
-    backgroundColor: '#F6F2EB', borderRadius: 12, padding: 16, fontSize: 16,
-    marginBottom: 12, color: C.text,
+    backgroundColor: COLORS.surfaceSubtle,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    fontSize: 15,
+    marginBottom: SPACING.sm + 2,
+    color: COLORS.textMain,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
-  foot: { textAlign: 'center', color: C.muted, marginVertical: 24 },
+  submitBtn: {
+    marginTop: SPACING.xs,
+    minHeight: 52,
+  },
+  switchModeButton: {
+    alignItems: 'center',
+    paddingTop: SPACING.md,
+  },
+  switchModeText: {
+    ...TYPOGRAPHY.bodyBold,
+    color: COLORS.primary,
+  },
+  footerNote: {
+    ...TYPOGRAPHY.caption,
+    textAlign: 'center',
+    color: COLORS.textMuted,
+    marginVertical: SPACING.lg,
+  },
 });

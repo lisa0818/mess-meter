@@ -1,22 +1,31 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
-    Alert, KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text, TextInput,
-    View,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
-import { BackLink, Card, Header, PrimaryButton } from '../components/ui';
+import { BackLink, Header, PrimaryButton } from '../components/ui';
 import { supabase } from '../lib/supabase';
-import { C } from '../lib/theme';
+import {
+  COLORS,
+  GLOBAL_STYLES,
+  RADIUS,
+  SHADOWS,
+  SPACING,
+  TYPOGRAPHY,
+} from '../theme/designSystem';
 
 const KINDS = [
   { id: 'bug', label: '🐞 Bug' },
   { id: 'idea', label: '💡 Idea' },
-  { id: 'other', label: 'Other' },
+  { id: 'other', label: '💬 Other' },
 ];
 
 export default function Feedback() {
@@ -27,67 +36,161 @@ export default function Feedback() {
 
   const submit = async () => {
     if (message.trim().length < 3) {
-      Alert.alert('Add a few words', 'Tell us what happened or what you would like to see.');
+      Alert.alert(
+        'Add a few words',
+        'Tell us what happened or what you would like to see.'
+      );
       return;
     }
     setBusy(true);
-    const { error } = await supabase.from('feedback').insert({ kind, message: message.trim() });
+    const { error } = await supabase
+      .from('feedback')
+      .insert({ kind, message: message.trim() });
     setBusy(false);
     if (error) {
       Alert.alert('Could not send', error.message);
       return;
     }
-    Alert.alert('Thank you!', 'Your feedback has been sent.', [{ text: 'OK', onPress: () => router.back() }]);
+    Alert.alert('Thank you!', 'Your feedback has been sent.', [
+      { text: 'OK', onPress: () => router.back() },
+    ]);
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }}>
+    <KeyboardAvoidingView
+      style={styles.keyboardContainer}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView
+        style={styles.container}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.scrollContent}
+      >
         <Header
           title="Send feedback"
-          subtitle="We read everything"
+          subtitle="We read every single note from students"
           left={<BackLink onPress={() => router.back()} />}
-          pad={56}
+          padBottom={SPACING.xxl + SPACING.md}
         />
-        <View style={{ paddingHorizontal: 20, marginTop: -34 }}>
-          <Card>
-            <View style={s.kinds}>
-              {KINDS.map((k) => (
-                <Pressable
-                  key={k.id}
-                  onPress={() => setKind(k.id)}
-                  style={[s.kind, kind === k.id && { backgroundColor: C.primary, borderColor: C.primary }]}
-                >
-                  <Text style={{ color: kind === k.id ? '#fff' : C.text, fontWeight: '700' }}>{k.label}</Text>
-                </Pressable>
-              ))}
+
+        <View style={styles.contentWrapper}>
+          <View style={[GLOBAL_STYLES.card, SHADOWS.card, styles.card]}>
+            <Text style={styles.sectionTitle}>Category</Text>
+            <View style={styles.kindsRow}>
+              {KINDS.map((k) => {
+                const isActive = kind === k.id;
+                return (
+                  <Pressable
+                    key={k.id}
+                    onPress={() => setKind(k.id)}
+                    accessibilityRole="button"
+                    style={[
+                      styles.kindPill,
+                      isActive && styles.kindPillActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.kindText,
+                        isActive && styles.kindTextActive,
+                      ]}
+                    >
+                      {k.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
+
+            <Text style={styles.sectionTitle}>Message</Text>
             <TextInput
-              style={s.input}
-              placeholder="What's on your mind?"
-              placeholderTextColor="#9CA3AF"
+              style={styles.input}
+              placeholder="What's on your mind? Suggestions, food quality, hygiene..."
+              placeholderTextColor={COLORS.textMuted}
               multiline
               maxLength={1000}
               value={message}
               onChangeText={setMessage}
               textAlignVertical="top"
             />
-            <PrimaryButton label="Send" onPress={submit} busy={busy} style={{ marginTop: 14 }} />
-          </Card>
+
+            <PrimaryButton
+              label="Send feedback"
+              onPress={submit}
+              busy={busy}
+              style={styles.submitBtn}
+            />
+          </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
-const s = StyleSheet.create({
-  kinds: { flexDirection: 'row', gap: 8, marginBottom: 14 },
-  kind: {
-    borderWidth: 1, borderColor: C.border, backgroundColor: C.card,
-    borderRadius: 22, paddingHorizontal: 16, minHeight: 44, justifyContent: 'center',
+const styles = StyleSheet.create({
+  keyboardContainer: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  scrollContent: {
+    paddingBottom: SPACING.xxl,
+  },
+  contentWrapper: {
+    paddingHorizontal: SPACING.md,
+    marginTop: -SPACING.xl,
+  },
+  card: {
+    padding: SPACING.lg,
+  },
+  sectionTitle: {
+    ...TYPOGRAPHY.bodyBold,
+    marginBottom: SPACING.xs + 2,
+  },
+  kindsRow: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    marginBottom: SPACING.md,
+  },
+  kindPill: {
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.full,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  kindPillActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  kindText: {
+    ...TYPOGRAPHY.body,
+    fontWeight: '600',
+    color: COLORS.textMain,
+  },
+  kindTextActive: {
+    color: COLORS.textInverse,
+    fontWeight: '700',
   },
   input: {
-    backgroundColor: '#F6F2EB', borderRadius: 12, padding: 16, fontSize: 16,
-    minHeight: 150, color: C.text,
+    backgroundColor: COLORS.surfaceSubtle,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    fontSize: 15,
+    minHeight: 140,
+    color: COLORS.textMain,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: SPACING.md,
+  },
+  submitBtn: {
+    minHeight: 52,
   },
 });
