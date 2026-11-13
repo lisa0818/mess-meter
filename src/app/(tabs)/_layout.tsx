@@ -1,9 +1,18 @@
 import { Tabs } from 'expo-router';
-import { Text } from 'react-native';
+import React from 'react';
+import { StyleSheet, Text } from 'react-native';
 import { useAuth } from '../../lib/auth';
-import { C } from '../../lib/theme';
+import {
+  COLORS,
+  RADIUS,
+  SHADOWS,
+  SPACING,
+  TYPOGRAPHY,
+} from '../../theme/designSystem';
 
-const icon = (e: string) => () => <Text style={{ fontSize: 20 }}>{e}</Text>;
+const TabIcon = ({ emoji }: { emoji: string }) => (
+  <Text style={styles.tabIconText}>{emoji}</Text>
+);
 
 export default function TabsLayout() {
   const { role } = useAuth();
@@ -14,29 +23,55 @@ export default function TabsLayout() {
       key={isAdmin ? 'admin' : 'student'}
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: C.primary,
-        tabBarInactiveTintColor: '#9CA3AF',
-        tabBarLabelStyle: { fontWeight: '600', fontSize: 11 },
-        tabBarStyle: {
-          backgroundColor: C.card,
-          borderTopWidth: 0,
-          elevation: 16,
-          shadowColor: C.navy,
-          shadowOpacity: 0.1,
-          shadowRadius: 12,
-        },
+        tabBarActiveTintColor: isAdmin ? COLORS.secondary : COLORS.primary,
+        tabBarInactiveTintColor: COLORS.textMuted,
+        tabBarLabelStyle: styles.tabBarLabel,
+        tabBarStyle: styles.tabBar,
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Today', tabBarIcon: icon('🍛') }} />
-      <Tabs.Screen name="trends" options={{ title: 'Trends', tabBarIcon: icon('📈') }} />
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: "Today's Menu",
+          tabBarIcon: () => <TabIcon emoji="🍛" />,
+        }}
+      />
+      <Tabs.Screen
+        name="trends"
+        options={{
+          title: 'Trends',
+          tabBarIcon: () => <TabIcon emoji="📈" />,
+        }}
+      />
       <Tabs.Screen
         name="admin"
         options={{
           title: 'Admin',
-          tabBarIcon: icon('📊'),
+          tabBarActiveTintColor: COLORS.secondary,
+          tabBarIcon: () => <TabIcon emoji="📊" />,
           tabBarButton: isAdmin ? undefined : () => null,
         }}
       />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  tabBar: {
+    backgroundColor: COLORS.surface,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    minHeight: 60,
+    paddingBottom: SPACING.xs,
+    paddingTop: SPACING.xs,
+    ...SHADOWS.card,
+  },
+  tabBarLabel: {
+    ...TYPOGRAPHY.caption,
+    fontWeight: '700',
+    fontSize: 11,
+  },
+  tabIconText: {
+    fontSize: 20,
+  },
+});

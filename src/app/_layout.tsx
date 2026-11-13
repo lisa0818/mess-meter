@@ -1,7 +1,7 @@
 import NetInfo from '@react-native-community/netinfo';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   ActivityIndicator,
   DeviceEventEmitter,
@@ -14,7 +14,9 @@ import { AuthProvider, useAuth } from '../lib/auth';
 import { setupReminders, useNotificationTap } from '../lib/notifications';
 import { flushQueue } from '../lib/ratings';
 import { supabase } from '../lib/supabase';
-import { C } from '../lib/theme';
+import {
+  COLORS,
+} from '../theme/designSystem';
 import { todayStr } from '../lib/utils';
 
 function Gate() {
@@ -47,7 +49,10 @@ function Gate() {
       const n = await flushQueue(uid);
       if (n > 0) {
         if (Platform.OS === 'android') {
-          ToastAndroid.show(`Synced ${n} offline rating${n > 1 ? 's' : ''} ✅`, ToastAndroid.SHORT);
+          ToastAndroid.show(
+            `Synced ${n} offline rating${n > 1 ? 's' : ''} ✅`,
+            ToastAndroid.SHORT
+          );
         }
         DeviceEventEmitter.emit('ratings-synced');
       }
@@ -78,18 +83,29 @@ function Gate() {
         .maybeSingle();
       if (!meal) return;
       const { data: done } = await supabase
-        .from('ratings').select('id').eq('meal_id', meal.id).maybeSingle();
+        .from('ratings')
+        .select('id')
+        .eq('meal_id', meal.id)
+        .maybeSingle();
       if (done) return;
-      router.push({ pathname: '/rate', params: { mealId: meal.id, mealType: meal.meal_type } });
+      router.push({
+        pathname: '/rate',
+        params: { mealId: meal.id, mealType: meal.meal_type },
+      });
     })();
   }, [lastResponse, uid, hostelId]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: C.bg }}>
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.bg } }} />
+    <View style={styles.container}>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: COLORS.background },
+        }}
+      />
       {loading && (
-        <View style={s.overlay}>
-          <ActivityIndicator size="large" color={C.primary} />
+        <View style={styles.overlay}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
         </View>
       )}
     </View>
@@ -105,10 +121,14 @@ export default function RootLayout() {
   );
 }
 
-const s = StyleSheet.create({
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
   overlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: C.bg,
+    backgroundColor: COLORS.background,
     alignItems: 'center',
     justifyContent: 'center',
   },
