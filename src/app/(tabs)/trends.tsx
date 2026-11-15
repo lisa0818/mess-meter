@@ -1,24 +1,40 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
-    ActivityIndicator, Dimensions, RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Dimensions,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import { BarChart, LineChart } from 'react-native-gifted-charts';
+import { Card, Header } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
-import { C } from '../../lib/theme';
+import {
+  COLORS,
+  GLOBAL_STYLES,
+  RADIUS,
+  SPACING,
+  TYPOGRAPHY,
+} from '../../theme/designSystem';
 import { dayLabel, daysAgoStr, MIN_RATINGS } from '../../lib/utils';
 
 const W = Dimensions.get('window').width;
-const CHART_W = W - 112;
+const CHART_W = W - 88;
 
-type Row = { meal_id: string; meal_date: string; meal_type: string; avg_stars: number; n: number };
+type Row = {
+  meal_id: string;
+  meal_date: string;
+  meal_type: string;
+  avg_stars: number;
+  n: number;
+};
 
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
-const colorFor = (v: number) => (v >= 4 ? C.good : v >= 3 ? '#F59F00' : C.bad);
+const ratingColor = (v: number) =>
+  v >= 4 ? COLORS.success : v >= 3 ? COLORS.warning : COLORS.danger;
 
 export default function Trends() {
   const [rows, setRows] = useState<Row[]>([]);
@@ -31,7 +47,10 @@ export default function Trends() {
       p_from: daysAgoStr(6),
       p_min: MIN_RATINGS,
     });
-    if (error) { setError(error.message); return; }
+    if (error) {
+      setError(error.message);
+      return;
+    }
     setError(null);
     setRows((data ?? []) as Row[]);
   }, []);
@@ -43,7 +62,11 @@ export default function Trends() {
   );
 
   if (loading) {
-    return <View style={s.center}><ActivityIndicator size="large" color={C.primary} /></View>;
+    return (
+      <View style={s.center}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
   }
 
   // Daily average (weighted by number of ratings)
@@ -71,9 +94,9 @@ export default function Trends() {
     return {
       value: v,
       label: cap(t),
-      frontColor: colorFor(v),
+      frontColor: ratingColor(v),
       topLabelComponent: () => (
-        <Text style={{ fontSize: 12, fontWeight: '700', color: C.text, marginBottom: 4 }}>{v}</Text>
+        <Text style={s.barTopLabel}>{v}</Text>
       ),
     };
   });
@@ -81,95 +104,194 @@ export default function Trends() {
   const worst = [...rows].sort((a, b) => a.avg_stars - b.avg_stars)[0];
 
   return (
-    <ScrollView
-      contentContainerStyle={{ padding: 20, paddingTop: 56, paddingBottom: 40 }}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          tintColor={C.primary}
-          onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }}
-        />
-      }
-    >
-      <Text style={s.title}>This week</Text>
-      <Text style={s.sub}>How your hostel mess is doing, based on anonymous ratings.</Text>
+    <View style={s.screen}>
+      <Header
+        title="Weekly Trends"
+        subtitle="Mess satisfaction overview based on anonymous ratings"
+      />
 
-      {error && <Text style={{ color: C.bad, marginTop: 16 }}>Couldn't load: {error}</Text>}
+      <ScrollView
+        contentContainerStyle={s.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            tintColor={COLORS.primary}
+            onRefresh={async () => {
+              setRefreshing(true);
+              await load();
+              setRefreshing(false);
+            }}
+          />
+        }
+      >
+        {error && (
+          <View style={s.errorBanner}>
+            <Text style={s.errorText}>Couldn't load: {error}</Text>
+          </View>
+        )}
 
-      {!error && rows.length === 0 && (
-        <Text style={s.empty}>
-          Not enough ratings yet. Scores appear once {MIN_RATINGS}+ students have rated a meal.
-        </Text>
-      )}
-
-      {worst && (
-        <View style={s.alert}>
-          <Text style={{ fontSize: 12, color: C.bad, fontWeight: '700' }}>LOWEST RATED THIS WEEK</Text>
-          <Text style={s.alertMain}>
-            {dayLabel(worst.meal_date)} {worst.meal_type} · ★ {worst.avg_stars}
+        {!error && rows.length === 0 && (
+          <Text style={s.emptyNotice}>
+            Not enough ratings yet. Scores appear once {MIN_RATINGS}+ students have rated a meal.
           </Text>
-          <Text style={{ color: C.muted }}>{worst.n} ratings</Text>
-        </View>
-      )}
+        )}
 
-      {line.length > 0 && (
-        <View style={s.card}>
-          <Text style={s.cardTitle}>Daily average</Text>
-          <LineChart
-            data={line}
-            width={CHART_W}
-            height={170}
-            maxValue={5}
-            noOfSections={5}
-            spacing={Math.max(28, (CHART_W - 20) / Math.max(line.length, 1))}
-            initialSpacing={12}
-            color={C.primary}
-            thickness={3}
-            dataPointsColor={C.primary}
-            curved
-            isAnimated
-            rulesColor={C.border}
-            yAxisColor={C.border}
-            xAxisColor={C.border}
-            yAxisTextStyle={{ color: C.muted, fontSize: 11 }}
-            xAxisLabelTextStyle={{ color: C.muted, fontSize: 11 }}
-          />
-        </View>
-      )}
+        {/* Actionable insight first: Lowest rated item with danger accent */}
+        {worst && (
+          <View style={s.alertCard}>
+            <Text style={s.alertLabel}>LOWEST RATED THIS WEEK</Text>
+            <View style={[GLOBAL_STYLES.rowBetween, { marginTop: SPACING.xs }]}>
+              <Text style={TYPOGRAPHY.h3}>
+                {dayLabel(worst.meal_date)} · {cap(worst.meal_type)}
+              </Text>
+              <View style={s.alertBadge}>
+                <Text style={s.alertBadgeText}>
+                  ★ {Number(worst.avg_stars).toFixed(1)}
+                </Text>
+              </View>
+            </View>
+            <Text style={s.alertSub}>{worst.n} student ratings recorded</Text>
+          </View>
+        )}
 
-      {bars.length > 0 && (
-        <View style={s.card}>
-          <Text style={s.cardTitle}>Average by meal</Text>
-          <BarChart
-            data={bars}
-            width={CHART_W}
-            height={160}
-            maxValue={5}
-            noOfSections={5}
-            barWidth={38}
-            spacing={22}
-            initialSpacing={12}
-            barBorderRadius={6}
-            yAxisThickness={0}
-            xAxisThickness={0}
-            isAnimated
-            rulesColor={C.border}
-            yAxisTextStyle={{ color: C.muted, fontSize: 11 }}
-            xAxisLabelTextStyle={{ color: C.muted, fontSize: 11 }}
-          />
-        </View>
-      )}
-    </ScrollView>
+        {/* Daily Average Chart */}
+        {line.length > 0 && (
+          <Card variant="bordered" style={s.chartCard}>
+            <Text style={s.cardTitle}>Daily Average</Text>
+            <LineChart
+              data={line}
+              width={CHART_W}
+              height={170}
+              maxValue={5}
+              noOfSections={5}
+              spacing={Math.max(28, (CHART_W - 20) / Math.max(line.length, 1))}
+              initialSpacing={12}
+              color={COLORS.primary}
+              thickness={2.5}
+              dataPointsColor={COLORS.primary}
+              curved
+              isAnimated
+              rulesColor={COLORS.border}
+              yAxisColor={COLORS.border}
+              xAxisColor={COLORS.border}
+              yAxisTextStyle={s.axisLabel}
+              xAxisLabelTextStyle={s.axisLabel}
+            />
+          </Card>
+        )}
+
+        {/* Average by Meal Chart */}
+        {bars.length > 0 && (
+          <Card variant="bordered" style={s.chartCard}>
+            <Text style={s.cardTitle}>Average by Meal</Text>
+            <BarChart
+              data={bars}
+              width={CHART_W}
+              height={160}
+              maxValue={5}
+              noOfSections={5}
+              barWidth={36}
+              spacing={22}
+              initialSpacing={12}
+              barBorderRadius={RADIUS.sm}
+              yAxisThickness={0}
+              xAxisThickness={0}
+              isAnimated
+              rulesColor={COLORS.border}
+              yAxisTextStyle={s.axisLabel}
+              xAxisLabelTextStyle={s.axisLabel}
+            />
+          </Card>
+        )}
+      </ScrollView>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 28, fontWeight: '800', color: C.text },
-  sub: { color: C.muted, marginTop: 4, marginBottom: 18 },
-  empty: { color: C.muted, textAlign: 'center', marginTop: 60, lineHeight: 22 },
-  alert: { backgroundColor: '#FFF5F5', borderRadius: 14, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: '#FFC9C9' },
-  alertMain: { fontSize: 20, fontWeight: '800', color: C.text, marginVertical: 4, textTransform: 'capitalize' },
-  card: { backgroundColor: C.card, borderRadius: 16, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: C.border, overflow: 'hidden' },
-  cardTitle: { fontWeight: '700', color: C.text, marginBottom: 14, fontSize: 16 },
+  screen: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.background,
+  },
+  content: {
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.sm,
+    paddingBottom: SPACING.xxl,
+  },
+  errorBanner: {
+    backgroundColor: '#FEE2E2',
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
+  },
+  errorText: {
+    color: COLORS.danger,
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  emptyNotice: {
+    ...TYPOGRAPHY.body,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    marginTop: SPACING.xxl,
+    lineHeight: 22,
+  },
+  alertCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    marginBottom: SPACING.lg,
+    borderLeftWidth: 3.5,
+    borderLeftColor: COLORS.danger,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  alertLabel: {
+    ...TYPOGRAPHY.caption,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    color: COLORS.danger,
+    fontWeight: '700',
+  },
+  alertBadge: {
+    backgroundColor: '#FEE2E2',
+    borderRadius: RADIUS.full,
+    paddingHorizontal: SPACING.sm + 2,
+    paddingVertical: SPACING.xs,
+  },
+  alertBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.danger,
+  },
+  alertSub: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textMuted,
+    marginTop: SPACING.xs,
+  },
+  chartCard: {
+    marginBottom: SPACING.lg,
+    overflow: 'hidden',
+  },
+  cardTitle: {
+    ...TYPOGRAPHY.h3,
+    marginBottom: SPACING.md,
+  },
+  barTopLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.textSecondary,
+    marginBottom: 4,
+  },
+  axisLabel: {
+    color: COLORS.textMuted,
+    fontSize: 11,
+  },
 });

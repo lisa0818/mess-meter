@@ -14,7 +14,7 @@ import { AuthProvider, useAuth } from '../lib/auth';
 import { setupReminders, useNotificationTap } from '../lib/notifications';
 import { flushQueue } from '../lib/ratings';
 import { supabase } from '../lib/supabase';
-import { C } from '../lib/theme';
+import { COLORS } from '../theme/designSystem';
 import { todayStr } from '../lib/utils';
 
 function Gate() {
@@ -85,11 +85,11 @@ function Gate() {
   }, [lastResponse, uid, hostelId]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: C.bg }}>
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.bg } }} />
+    <View style={{ flex: 1, backgroundColor: COLORS.background }}>
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: COLORS.background } }} />
       {loading && (
         <View style={s.overlay}>
-          <ActivityIndicator size="large" color={C.primary} />
+          <ActivityIndicator size="large" color={COLORS.primary} />
         </View>
       )}
     </View>
@@ -99,7 +99,7 @@ function Gate() {
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
       <Gate />
     </AuthProvider>
   );
@@ -108,7 +108,7 @@ export default function RootLayout() {
 const s = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: C.bg,
+    backgroundColor: COLORS.background,
     alignItems: 'center',
     justifyContent: 'center',
   },

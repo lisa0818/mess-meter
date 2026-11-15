@@ -1,17 +1,24 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-    Alert, KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text, TextInput,
-    View,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 import { BackLink, Card, Header, PrimaryButton } from '../components/ui';
 import { supabase } from '../lib/supabase';
-import { C } from '../lib/theme';
+import {
+  COLORS,
+  RADIUS,
+  SPACING,
+  TYPOGRAPHY,
+} from '../theme/designSystem';
 
 const KINDS = [
   { id: 'bug', label: '🐞 Bug' },
@@ -41,53 +48,132 @@ export default function Feedback() {
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }}>
-        <Header
-          title="Send feedback"
-          subtitle="We read everything"
-          left={<BackLink onPress={() => router.back()} />}
-          pad={56}
-        />
-        <View style={{ paddingHorizontal: 20, marginTop: -34 }}>
-          <Card>
-            <View style={s.kinds}>
-              {KINDS.map((k) => (
+    <KeyboardAvoidingView
+      style={s.screen}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <Header
+        title="Send Feedback"
+        subtitle="We read every single suggestion and report"
+        left={<BackLink onPress={() => router.back()} />}
+      />
+
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={s.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <Card variant="bordered">
+          <Text style={s.label}>CATEGORY</Text>
+          <View style={s.kinds}>
+            {KINDS.map((k) => {
+              const isSelected = kind === k.id;
+              return (
                 <Pressable
                   key={k.id}
                   onPress={() => setKind(k.id)}
-                  style={[s.kind, kind === k.id && { backgroundColor: C.primary, borderColor: C.primary }]}
+                  style={[
+                    s.kindPill,
+                    isSelected ? s.kindPillSelected : s.kindPillUnselected,
+                  ]}
                 >
-                  <Text style={{ color: kind === k.id ? '#fff' : C.text, fontWeight: '700' }}>{k.label}</Text>
+                  <Text
+                    style={[
+                      s.kindText,
+                      isSelected ? s.kindTextSelected : s.kindTextUnselected,
+                    ]}
+                  >
+                    {k.label}
+                  </Text>
                 </Pressable>
-              ))}
-            </View>
-            <TextInput
-              style={s.input}
-              placeholder="What's on your mind?"
-              placeholderTextColor="#9CA3AF"
-              multiline
-              maxLength={1000}
-              value={message}
-              onChangeText={setMessage}
-              textAlignVertical="top"
-            />
-            <PrimaryButton label="Send" onPress={submit} busy={busy} style={{ marginTop: 14 }} />
-          </Card>
-        </View>
+              );
+            })}
+          </View>
+
+          <Text style={[s.label, { marginTop: SPACING.lg }]}>MESSAGE</Text>
+          <TextInput
+            style={s.input}
+            placeholder="What's on your mind?"
+            placeholderTextColor={COLORS.textMuted}
+            multiline
+            maxLength={1000}
+            value={message}
+            onChangeText={setMessage}
+            textAlignVertical="top"
+          />
+
+          <PrimaryButton
+            label="Send Feedback"
+            onPress={submit}
+            busy={busy}
+            style={s.submitBtn}
+          />
+        </Card>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const s = StyleSheet.create({
-  kinds: { flexDirection: 'row', gap: 8, marginBottom: 14 },
-  kind: {
-    borderWidth: 1, borderColor: C.border, backgroundColor: C.card,
-    borderRadius: 22, paddingHorizontal: 16, minHeight: 44, justifyContent: 'center',
+  screen: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  content: {
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.sm,
+    paddingBottom: SPACING.xxl,
+  },
+  label: {
+    ...TYPOGRAPHY.caption,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    color: COLORS.textMuted,
+    marginBottom: SPACING.sm,
+  },
+  kinds: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
+  kindPill: {
+    borderRadius: RADIUS.full,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    minHeight: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  kindPillUnselected: {
+    backgroundColor: COLORS.surfaceSubtle,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  kindPillSelected: {
+    backgroundColor: COLORS.primary,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+  },
+  kindText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  kindTextUnselected: {
+    color: COLORS.textSecondary,
+  },
+  kindTextSelected: {
+    color: COLORS.textInverse,
   },
   input: {
-    backgroundColor: '#F6F2EB', borderRadius: 12, padding: 16, fontSize: 16,
-    minHeight: 150, color: C.text,
+    backgroundColor: COLORS.surfaceSubtle,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    fontSize: 15,
+    minHeight: 140,
+    color: COLORS.textMain,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  submitBtn: {
+    marginTop: SPACING.lg,
   },
 });

@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
 import { Text } from 'react-native';
 import { useAuth } from '../../lib/auth';
-import { C } from '../../lib/theme';
+import { COLORS } from '../../theme/designSystem';
 
 const icon = (e: string) => () => <Text style={{ fontSize: 20 }}>{e}</Text>;
 
@@ -14,16 +14,14 @@ export default function TabsLayout() {
       key={isAdmin ? 'admin' : 'student'}
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: C.primary,
-        tabBarInactiveTintColor: '#9CA3AF',
+        tabBarActiveTintColor: COLORS.primary,
+        tabBarInactiveTintColor: COLORS.textMuted,
         tabBarLabelStyle: { fontWeight: '600', fontSize: 11 },
         tabBarStyle: {
-          backgroundColor: C.card,
-          borderTopWidth: 0,
-          elevation: 16,
-          shadowColor: C.navy,
-          shadowOpacity: 0.1,
-          shadowRadius: 12,
+          backgroundColor: COLORS.surface,
+          borderTopWidth: 1,
+          borderTopColor: COLORS.border,
+          elevation: 0,
         },
       }}
     >

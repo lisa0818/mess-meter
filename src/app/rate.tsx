@@ -4,17 +4,25 @@ import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-  Alert, Image,
-  Pressable, ScrollView,
+  Alert,
+  Image,
+  Pressable,
+  ScrollView,
   StyleSheet,
   Text,
-  View
+  View,
 } from 'react-native';
 import { BackLink, Card, Header, PrimaryButton } from '../components/ui';
 import { useAuth } from '../lib/auth';
 import { submitRating } from '../lib/ratings';
 import { supabase } from '../lib/supabase';
-import { C } from '../lib/theme';
+import {
+  COLORS,
+  GLOBAL_STYLES,
+  RADIUS,
+  SPACING,
+  TYPOGRAPHY,
+} from '../theme/designSystem';
 
 const TAGS = ['Great taste', 'Undercooked', 'Too oily', 'Too salty', 'Cold', 'Small portion', 'Hygiene issue'];
 const POSITIVE = ['Great taste'];
@@ -94,115 +102,286 @@ export default function Rate() {
   if (done) {
     return (
       <View style={s.center}>
-        <View style={[s.bigIcon, { backgroundColor: done === 'queued' ? C.warnSoft : C.goodSoft }]}>
-          <Text style={{ fontSize: 56 }}>{done === 'queued' ? '⏳' : '✅'}</Text>
+        <View
+          style={[
+            s.bigIcon,
+            { backgroundColor: done === 'queued' ? COLORS.primaryLight : '#DCFCE7' },
+          ]}
+        >
+          <Text style={{ fontSize: 48 }}>{done === 'queued' ? '⏳' : '✓'}</Text>
         </View>
-        <Text style={s.thanks}>{done === 'queued' ? 'Saved offline' : 'Thanks! Your voice counts.'}</Text>
+        <Text style={[TYPOGRAPHY.h2, { marginTop: SPACING.lg, textAlign: 'center' }]}>
+          {done === 'queued' ? 'Saved offline' : 'Thanks! Your voice counts.'}
+        </Text>
         {done === 'queued' && (
-          <Text style={s.sub}>We'll send it automatically when you're back online.</Text>
+          <Text style={[TYPOGRAPHY.body, { color: COLORS.textMuted, marginTop: SPACING.xs, textAlign: 'center' }]}>
+            We'll send it automatically when you're back online.
+          </Text>
         )}
       </View>
     );
   }
 
+  const titleMeal = mealType ? mealType[0].toUpperCase() + mealType.slice(1) : 'Meal';
+
   return (
-    <ScrollView contentContainerStyle={{ paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+    <View style={s.screen}>
       <Header
-        title={`How was ${mealType ?? 'meal'}?`}
+        title={`How was ${titleMeal}?`}
         subtitle="10 seconds · anonymous"
         left={<BackLink onPress={() => router.back()} />}
-        pad={60}
       />
 
-      <View style={{ paddingHorizontal: 20, marginTop: -40 }}>
-        <Card style={skipped ? { opacity: 0.4 } : undefined}>
-          <View style={s.stars}>
+      <ScrollView
+        contentContainerStyle={s.content}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Interactive Star Rating */}
+        <Card elevated style={[s.starCard, skipped && { opacity: 0.35 }]}>
+          <View style={s.starsRow}>
             {[1, 2, 3, 4, 5].map((n) => (
-              <Pressable key={n} onPress={() => !skipped && setStars(n)} hitSlop={6} style={{ padding: 2 }}>
-                <Text style={[s.star, { color: n <= stars ? C.star : '#E5E7EB' }]}>★</Text>
+              <Pressable
+                key={n}
+                onPress={() => !skipped && setStars(n)}
+                hitSlop={8}
+                style={s.starTouch}
+              >
+                <Text
+                  style={[
+                    s.starGlyph,
+                    { color: n <= stars ? COLORS.star : COLORS.border },
+                  ]}
+                >
+                  ★
+                </Text>
               </Pressable>
             ))}
           </View>
-          <Text style={s.word}>{WORDS[stars]}</Text>
+          <Text style={s.wordLabel}>{WORDS[stars]}</Text>
         </Card>
 
-        <Text style={s.section}>What stood out? (optional)</Text>
-        <View style={[s.tagWrap, skipped && { opacity: 0.3 }]} pointerEvents={skipped ? 'none' : 'auto'}>
-          {TAGS.map((t) => {
-            const on = tags.includes(t);
-            const color = POSITIVE.includes(t) ? C.good : C.bad;
-            return (
-              <Pressable
-                key={t}
-                onPress={() => toggleTag(t)}
-                style={[s.tag, on && { backgroundColor: color, borderColor: color }]}
-              >
-                <Text style={[s.tagText, on && { color: '#fff' }]}>{t}</Text>
-              </Pressable>
-            );
-          })}
+        {/* Feedback Tags */}
+        <View style={s.sectionWrap}>
+          <Text style={s.sectionTitle}>What stood out? (optional)</Text>
+          <View
+            style={[s.tagWrap, skipped && { opacity: 0.35 }]}
+            pointerEvents={skipped ? 'none' : 'auto'}
+          >
+            {TAGS.map((t) => {
+              const on = tags.includes(t);
+              const isPositive = POSITIVE.includes(t);
+              return (
+                <Pressable
+                  key={t}
+                  onPress={() => toggleTag(t)}
+                  style={[
+                    s.tagPill,
+                    on && (isPositive ? s.tagPillPositive : s.tagPillNegative),
+                  ]}
+                >
+                  <Text
+                    style={[
+                      s.tagPillText,
+                      on && { color: COLORS.textInverse, fontWeight: '700' },
+                    ]}
+                  >
+                    {t}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
 
-        <View style={[{ marginTop: 22 }, skipped && { opacity: 0.3 }]} pointerEvents={skipped ? 'none' : 'auto'}>
+        {/* Optional Photo */}
+        <View
+          style={[s.sectionWrap, skipped && { opacity: 0.35 }]}
+          pointerEvents={skipped ? 'none' : 'auto'}
+        >
           {photo ? (
             <View style={s.photoRow}>
               <Image source={{ uri: photo.uri }} style={s.thumb} />
               <Pressable onPress={() => setPhoto(null)} hitSlop={10}>
-                <Text style={{ color: C.bad, fontWeight: '700' }}>Remove photo</Text>
+                <Text style={s.removePhotoText}>Remove photo</Text>
               </Pressable>
             </View>
           ) : (
             <Pressable style={s.photoBtn} onPress={takePhoto}>
-              <Text style={{ color: C.muted, fontWeight: '600' }}>📷  Add a plate photo (optional)</Text>
+              <Text style={s.photoBtnText}>📷  Add a plate photo (optional)</Text>
             </Pressable>
           )}
         </View>
 
+        {/* Skip Option */}
         <Pressable
           style={s.skipRow}
           onPress={() => {
             setSkipped(!skipped);
-            setStars(0);
-            setTags([]);
-            setPhoto(null);
+            if (!skipped) {
+              setStars(0);
+              setTags([]);
+              setPhoto(null);
+            }
           }}
         >
-          <View style={[s.check, skipped && { backgroundColor: C.primary, borderColor: C.primary }]}>
-            {skipped && <Text style={{ color: '#fff', fontSize: 12 }}>✓</Text>}
+          <View
+            style={[
+              s.checkbox,
+              skipped && { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+            ]}
+          >
+            {skipped ? <Text style={s.checkmark}>✓</Text> : null}
           </View>
-          <Text style={{ color: C.text, fontSize: 15 }}>I skipped this meal</Text>
+          <Text style={s.skipText}>I skipped this meal</Text>
         </Pressable>
 
-        <PrimaryButton label="Submit" onPress={submit} busy={busy} style={{ minHeight: 56 }} />
-      </View>
-    </ScrollView>
+        {/* Single Primary CTA */}
+        <PrimaryButton
+          label="Submit Rating"
+          onPress={submit}
+          busy={busy}
+          style={s.submitBtn}
+        />
+      </ScrollView>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  bigIcon: { width: 112, height: 112, borderRadius: 56, alignItems: 'center', justifyContent: 'center' },
-  thanks: { fontSize: 22, fontWeight: '800', color: C.text, marginTop: 18 },
-  sub: { color: C.muted, marginTop: 6, textAlign: 'center' },
-  stars: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 4 },
-  star: { fontSize: 50 },
-  word: { textAlign: 'center', color: C.muted, fontWeight: '600', marginTop: 4 },
-  section: { fontWeight: '800', color: C.text, marginTop: 6, marginBottom: 10, fontSize: 15 },
-  tagWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  tag: {
-    borderWidth: 1, borderColor: C.border, backgroundColor: C.card,
-    borderRadius: 22, paddingHorizontal: 14, minHeight: 44, justifyContent: 'center',
+  screen: {
+    flex: 1,
+    backgroundColor: COLORS.background,
   },
-  tagText: { color: C.text, fontWeight: '600' },
+  content: {
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.xxl,
+  },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: SPACING.xl,
+    backgroundColor: COLORS.background,
+  },
+  bigIcon: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  starCard: {
+    alignItems: 'center',
+    paddingVertical: SPACING.lg,
+    marginBottom: SPACING.xl,
+  },
+  starsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+  },
+  starTouch: {
+    padding: SPACING.xs,
+  },
+  starGlyph: {
+    fontSize: 48,
+  },
+  wordLabel: {
+    ...TYPOGRAPHY.bodyBold,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.sm,
+  },
+  sectionWrap: {
+    marginBottom: SPACING.xl,
+  },
+  sectionTitle: {
+    ...TYPOGRAPHY.h3,
+    marginBottom: SPACING.sm,
+  },
+  tagWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.sm,
+  },
+  tagPill: {
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.full,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    justifyContent: 'center',
+  },
+  tagPillPositive: {
+    backgroundColor: COLORS.success,
+    borderColor: COLORS.success,
+  },
+  tagPillNegative: {
+    backgroundColor: COLORS.danger,
+    borderColor: COLORS.danger,
+  },
+  tagPillText: {
+    ...TYPOGRAPHY.body,
+    fontSize: 13,
+    color: COLORS.textMain,
+  },
   photoBtn: {
-    borderWidth: 1.5, borderColor: '#D1D5DB', borderStyle: 'dashed', borderRadius: 14,
-    minHeight: 56, alignItems: 'center', justifyContent: 'center', backgroundColor: C.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderStyle: 'dashed',
+    borderRadius: RADIUS.md,
+    minHeight: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.surface,
   },
-  photoRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  thumb: { width: 84, height: 84, borderRadius: 14 },
-  skipRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 24, minHeight: 44 },
-  check: {
-    width: 24, height: 24, borderRadius: 7, borderWidth: 2, borderColor: '#D1D5DB',
-    alignItems: 'center', justifyContent: 'center',
+  photoBtnText: {
+    ...TYPOGRAPHY.body,
+    color: COLORS.textMuted,
+  },
+  photoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+  },
+  thumb: {
+    width: 76,
+    height: 76,
+    borderRadius: RADIUS.md,
+  },
+  removePhotoText: {
+    ...TYPOGRAPHY.bodyBold,
+    color: COLORS.danger,
+  },
+  skipRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginBottom: SPACING.xl,
+    paddingVertical: SPACING.xs,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.surface,
+  },
+  checkmark: {
+    color: COLORS.textInverse,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  skipText: {
+    ...TYPOGRAPHY.body,
+    color: COLORS.textSecondary,
+  },
+  submitBtn: {
+    marginTop: SPACING.sm,
   },
 });

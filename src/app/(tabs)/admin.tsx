@@ -1,17 +1,36 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Card, Header } from '../../components/ui';
+import {
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { Card, Header, StatCard } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
-import { C, R, shadow } from '../../lib/theme';
+import {
+  COLORS,
+  GLOBAL_STYLES,
+  RADIUS,
+  SPACING,
+  TYPOGRAPHY,
+} from '../../theme/designSystem';
 import { dayLabel } from '../../lib/utils';
 
-type Summary = { total_ratings: number; raters: number; members: number; avg_stars: number | null };
+type Summary = {
+  total_ratings: number;
+  raters: number;
+  members: number;
+  avg_stars: number | null;
+};
 type Tag = { tag: string; n: number };
 type TypeAvg = { meal_type: string; avg_stars: number; n: number };
 type Worst = { meal_date: string; meal_type: string; avg_stars: number; n: number };
 
-const colorFor = (v: number) => (v >= 4 ? C.good : v >= 3 ? '#F59E0B' : C.bad);
+const ratingColor = (v: number) =>
+  v >= 4 ? COLORS.success : v >= 3 ? COLORS.warning : COLORS.danger;
 
 export default function Admin() {
   const [sum, setSum] = useState<Summary | null>(null);
@@ -30,7 +49,10 @@ export default function Admin() {
       supabase.rpc('admin_worst_meals', { p_days: 7 }),
     ]);
     const err = a.error || b.error || c.error || d.error;
-    if (err) { setError(err.message); return; }
+    if (err) {
+      setError(err.message);
+      return;
+    }
     setError(null);
     setSum((a.data?.[0] as Summary) ?? null);
     setTags((b.data ?? []) as Tag[]);
@@ -45,114 +67,274 @@ export default function Admin() {
   );
 
   if (loading) {
-    return <View style={s.center}><ActivityIndicator size="large" color={C.primary} /></View>;
+    return (
+      <View style={s.center}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
   }
 
-  const participation = sum && sum.members > 0 ? Math.round((sum.raters / sum.members) * 100) : 0;
+  const participation =
+    sum && sum.members > 0 ? Math.round((sum.raters / sum.members) * 100) : 0;
   const maxTag = Math.max(1, ...tags.map((t) => t.n));
-
-  const tiles = [
-    { num: String(sum?.total_ratings ?? 0), lbl: 'Ratings' },
-    { num: `${participation}%`, lbl: 'Participation' },
-    { num: String(sum?.avg_stars ?? '–'), lbl: 'Avg ★' },
-  ];
+  const lowestAvg = worst.length > 0 ? `★ ${worst[0].avg_stars}` : 'None';
 
   return (
-    <ScrollView
-      contentContainerStyle={{ paddingBottom: 40 }}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          tintColor={C.primary}
-          onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }}
-        />
-      }
-    >
-      <Header title="Management view" subtitle="Last 7 days · Demo Hostel A" pad={60} />
+    <View style={s.screen}>
+      <Header
+        title="Admin Dashboard"
+        subtitle="Last 7 days · Demo Hostel A"
+      />
 
-      <View style={{ paddingHorizontal: 20, marginTop: -40 }}>
-        {error && <Text style={{ color: C.bad, marginBottom: 12 }}>Couldn't load: {error}</Text>}
+      <ScrollView
+        contentContainerStyle={s.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            tintColor={COLORS.primary}
+            onRefresh={async () => {
+              setRefreshing(true);
+              await load();
+              setRefreshing(false);
+            }}
+          />
+        }
+      >
+        {error && (
+          <View style={s.errorBanner}>
+            <Text style={s.errorText}>Couldn't load: {error}</Text>
+          </View>
+        )}
 
-        <View style={s.tiles}>
-          {tiles.map((t) => (
-            <View key={t.lbl} style={[s.tile, shadow]}>
-              <Text style={s.tileNum}>{t.num}</Text>
-              <Text style={s.tileLbl}>{t.lbl}</Text>
-            </View>
-          ))}
+        {/* 2x2 Bento-Style KPI Grid */}
+        <View style={s.bentoGrid}>
+          <View style={s.bentoRow}>
+            <StatCard
+              label="TODAY'S AVG"
+              value={sum?.avg_stars !== null && sum?.avg_stars !== undefined ? `★ ${sum.avg_stars}` : '–'}
+            />
+            <StatCard
+              label="PARTICIPATION"
+              value={`${participation}%`}
+            />
+          </View>
+          <View style={s.bentoRow}>
+            <StatCard
+              label="TOTAL RATINGS"
+              value={sum?.total_ratings ?? 0}
+            />
+            <StatCard
+              label="LOWEST RATED"
+              value={lowestAvg}
+              accent={worst.length > 0 ? COLORS.danger : COLORS.secondary}
+            />
+          </View>
         </View>
 
-        <Card>
-          <Text style={s.cardTitle}>Average by meal</Text>
-          {types.map((t) => (
-            <View key={t.meal_type} style={s.barRow}>
-              <Text style={s.barLbl}>{t.meal_type}</Text>
-              <View style={s.barTrack}>
-                <View style={[s.barFill, { width: `${(t.avg_stars / 5) * 100}%`, backgroundColor: colorFor(t.avg_stars) }]} />
-              </View>
-              <Text style={s.barVal}>{t.avg_stars}</Text>
-            </View>
-          ))}
-        </Card>
+        {/* Actionable Insights First: Requires Attention with left-border accent */}
+        <View style={s.sectionWrap}>
+          <Text style={s.sectionHeader}>REQUIRES ATTENTION</Text>
+          {worst.length === 0 ? (
+            <Card variant="bordered">
+              <Text style={s.emptyNotice}>No meals flagged for attention this week.</Text>
+            </Card>
+          ) : (
+            worst.map((w, i) => (
+              <View key={`${w.meal_date}-${w.meal_type}-${i}`} style={s.attentionCard}>
+                <View style={GLOBAL_STYLES.rowBetween}>
+                  <View style={{ flex: 1, marginRight: SPACING.sm }}>
+                    <Text style={TYPOGRAPHY.bodyBold} numberOfLines={1}>
+                      {dayLabel(w.meal_date)} · {w.meal_type[0].toUpperCase() + w.meal_type.slice(1)}
+                    </Text>
+                    <Text style={[TYPOGRAPHY.caption, { marginTop: 2 }]}>
+                      {w.n} student{w.n !== 1 ? 's' : ''} reported issues
+                    </Text>
+                  </View>
 
-        <Card>
-          <Text style={s.cardTitle}>Top feedback tags</Text>
-          {tags.length === 0 && <Text style={{ color: C.muted }}>No tags yet.</Text>}
-          {tags.map((t) => (
-            <View key={t.tag} style={s.barRow}>
-              <Text style={[s.barLbl, { width: 104 }]} numberOfLines={1}>{t.tag}</Text>
-              <View style={s.barTrack}>
-                <View
-                  style={[
-                    s.barFill,
-                    { width: `${(t.n / maxTag) * 100}%`, backgroundColor: t.tag === 'Great taste' ? C.good : C.bad },
-                  ]}
-                />
+                  <View style={s.alertBadge}>
+                    <Text style={s.alertBadgeText}>
+                      ★ {Number(w.avg_stars).toFixed(1)}
+                    </Text>
+                  </View>
+                </View>
               </View>
-              <Text style={s.barVal}>{t.n}</Text>
-            </View>
-          ))}
-        </Card>
+            ))
+          )}
+        </View>
 
-        <Card>
-          <Text style={s.cardTitle}>Needs attention</Text>
-          {worst.length === 0 && <Text style={{ color: C.muted }}>Nothing flagged.</Text>}
-          {worst.map((w, i) => (
-            <View key={i} style={s.worstRow}>
-              <Text style={{ color: C.text, textTransform: 'capitalize', fontWeight: '600' }}>
-                {dayLabel(w.meal_date)} {w.meal_type}
-              </Text>
-              <View style={[s.badge, { backgroundColor: C.badSoft }]}>
-                <Text style={{ color: C.bad, fontWeight: '800' }}>
-                  ★ {w.avg_stars} <Text style={{ fontWeight: '400' }}>({w.n})</Text>
-                </Text>
-              </View>
-            </View>
-          ))}
-        </Card>
-      </View>
-    </ScrollView>
+        {/* Clean Data Lists: Average by Meal */}
+        <View style={s.sectionWrap}>
+          <Text style={s.sectionHeader}>AVERAGE BY MEAL</Text>
+          <Card variant="bordered">
+            {types.length === 0 ? (
+              <Text style={s.emptyNotice}>No meal data available.</Text>
+            ) : (
+              types.map((t) => (
+                <View key={t.meal_type} style={s.mealItemRow}>
+                  <View style={GLOBAL_STYLES.rowBetween}>
+                    <Text style={s.mealTypeName}>
+                      {t.meal_type[0].toUpperCase() + t.meal_type.slice(1)}
+                    </Text>
+                    <View style={s.ratingPill}>
+                      <Text
+                        style={[
+                          s.ratingPillText,
+                          { color: ratingColor(Number(t.avg_stars)) },
+                        ]}
+                      >
+                        ★ {Number(t.avg_stars).toFixed(1)}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={GLOBAL_STYLES.progressBarTrack}>
+                    <View
+                      style={[
+                        GLOBAL_STYLES.progressBarFill,
+                        {
+                          width: `${Math.min(100, (Number(t.avg_stars) / 5) * 100)}%`,
+                          backgroundColor: ratingColor(Number(t.avg_stars)),
+                        },
+                      ]}
+                    />
+                  </View>
+                </View>
+              ))
+            )}
+          </Card>
+        </View>
+
+        {/* Top Feedback Tags */}
+        <View style={s.sectionWrap}>
+          <Text style={s.sectionHeader}>TOP FEEDBACK TAGS</Text>
+          <Card variant="bordered">
+            {tags.length === 0 ? (
+              <Text style={s.emptyNotice}>No student tags recorded yet.</Text>
+            ) : (
+              tags.map((t) => {
+                const isPositive = t.tag === 'Great taste';
+                return (
+                  <View key={t.tag} style={s.tagItemRow}>
+                    <View style={GLOBAL_STYLES.rowBetween}>
+                      <Text style={TYPOGRAPHY.body} numberOfLines={1}>
+                        {t.tag}
+                      </Text>
+                      <Text style={TYPOGRAPHY.bodyBold}>{t.n}</Text>
+                    </View>
+
+                    <View style={GLOBAL_STYLES.progressBarTrack}>
+                      <View
+                        style={[
+                          GLOBAL_STYLES.progressBarFill,
+                          {
+                            width: `${(t.n / maxTag) * 100}%`,
+                            backgroundColor: isPositive ? COLORS.success : COLORS.danger,
+                          },
+                        ]}
+                      />
+                    </View>
+                  </View>
+                );
+              })
+            )}
+          </Card>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  tiles: { flexDirection: 'row', gap: 10, marginBottom: 14 },
-  tile: {
-    flex: 1, backgroundColor: C.card, borderRadius: R.card, padding: 14,
-    borderWidth: 1, borderColor: C.border, alignItems: 'center',
+  screen: {
+    flex: 1,
+    backgroundColor: COLORS.background,
   },
-  tileNum: { fontSize: 24, fontWeight: '800', color: C.primary },
-  tileLbl: { color: C.muted, fontSize: 12, marginTop: 2 },
-  cardTitle: { fontWeight: '800', color: C.text, marginBottom: 12, fontSize: 16 },
-  barRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-  barLbl: { width: 84, color: C.text, textTransform: 'capitalize', fontSize: 13 },
-  barTrack: { flex: 1, height: 12, backgroundColor: '#F1EEE8', borderRadius: 6, overflow: 'hidden' },
-  barFill: { height: 12, borderRadius: 6 },
-  barVal: { width: 36, textAlign: 'right', fontWeight: '800', color: C.text },
-  worstRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: C.border,
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.background,
   },
-  badge: { borderRadius: 14, paddingHorizontal: 10, paddingVertical: 4 },
+  content: {
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.sm,
+    paddingBottom: SPACING.xxl,
+  },
+  errorBanner: {
+    backgroundColor: '#FEE2E2',
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
+  },
+  errorText: {
+    color: COLORS.danger,
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  bentoGrid: {
+    gap: SPACING.sm,
+    marginBottom: SPACING.xl,
+  },
+  bentoRow: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
+  sectionWrap: {
+    marginBottom: SPACING.xl,
+  },
+  sectionHeader: {
+    ...TYPOGRAPHY.caption,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    color: COLORS.textMuted,
+    marginBottom: SPACING.sm,
+  },
+  attentionCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    marginBottom: SPACING.sm,
+    borderLeftWidth: 3.5,
+    borderLeftColor: COLORS.danger,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  alertBadge: {
+    backgroundColor: '#FEE2E2',
+    borderRadius: RADIUS.full,
+    paddingHorizontal: SPACING.sm + 2,
+    paddingVertical: SPACING.xs,
+  },
+  alertBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.danger,
+  },
+  emptyNotice: {
+    ...TYPOGRAPHY.body,
+    color: COLORS.textMuted,
+    paddingVertical: SPACING.xs,
+  },
+  mealItemRow: {
+    marginBottom: SPACING.md,
+    gap: SPACING.xs,
+  },
+  mealTypeName: {
+    ...TYPOGRAPHY.bodyBold,
+  },
+  ratingPill: {
+    backgroundColor: COLORS.surfaceSubtle,
+    borderRadius: RADIUS.full,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 2,
+  },
+  ratingPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  tagItemRow: {
+    marginBottom: SPACING.md,
+    gap: SPACING.xs,
+  },
 });

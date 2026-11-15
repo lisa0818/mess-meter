@@ -1,32 +1,52 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   DeviceEventEmitter,
-  FlatList, Pressable, RefreshControl,
+  FlatList,
+  Pressable,
+  RefreshControl,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { Card, Header, PrimaryButton } from '../../components/ui';
+import { Card, Header, PrimaryButton, VegDot } from '../../components/ui';
 import { useAuth } from '../../lib/auth';
 import { sendTestReminder } from '../../lib/notifications';
 import { getQueue } from '../../lib/ratings';
 import { supabase } from '../../lib/supabase';
-import { C } from '../../lib/theme';
+import {
+  COLORS,
+  GLOBAL_STYLES,
+  RADIUS,
+  SPACING,
+  TYPOGRAPHY,
+} from '../../theme/designSystem';
 import { MIN_RATINGS, todayStr } from '../../lib/utils';
 
 const ORDER = ['breakfast', 'lunch', 'snacks', 'dinner'];
-const EMOJI: Record<string, string> = { breakfast: '🍳', lunch: '🍛', snacks: '☕', dinner: '🍽️' };
+const TIMINGS: Record<string, string> = {
+  breakfast: '7:30 AM – 9:30 AM',
+  lunch: '12:30 PM – 2:30 PM',
+  snacks: '5:00 PM – 6:15 PM',
+  dinner: '8:00 PM – 10:00 PM',
+};
+const EMOJI: Record<string, string> = {
+  breakfast: '🍳',
+  lunch: '🍛',
+  snacks: '☕',
+  dinner: '🍽️',
+};
 
 type Meal = { id: string; meal_type: string; menu_items: string[] };
 type Score = { meal_id: string; avg_stars: number; n: number };
 type Mine = { stars: number | null; skipped: boolean };
 
-const chipColors = (v: number) =>
-  v >= 4 ? { bg: C.goodSoft, fg: C.good }
-  : v >= 3 ? { bg: C.warnSoft, fg: C.warnText }
-  : { bg: C.badSoft, fg: C.bad };
+const isMealNonVeg = (items: string[]) => {
+  const nonVegKeywords = ['chicken', 'egg', 'fish', 'mutton', 'meat', 'prawn', 'beef', 'pork'];
+  const text = items.join(' ').toLowerCase();
+  return nonVegKeywords.some((k) => text.includes(k));
+};
 
 export default function Today() {
   const router = useRouter();
@@ -85,48 +105,91 @@ export default function Today() {
   const greet = hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening';
   const date = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short' });
 
+  // Determine current active meal slot
+  const currentSlot = useMemo(() => {
+    if (hr < 11) return 'breakfast';
+    if (hr < 16) return 'lunch';
+    if (hr < 18) return 'snacks';
+    return 'dinner';
+  }, [hr]);
+
+  // The active meal is the currently matching time slot if unrated, or the first unrated meal
+  const activeMealId = useMemo(() => {
+    if (meals.length === 0) return null;
+    const currentMeal = meals.find((m) => m.meal_type === currentSlot);
+    if (currentMeal && !(mine[currentMeal.id] || pending[currentMeal.id])) {
+      return currentMeal.id;
+    }
+    const firstUnrated = meals.find((m) => !(mine[m.id] || pending[m.id]));
+    return firstUnrated?.id || meals[0]?.id;
+  }, [meals, currentSlot, mine, pending]);
+
   const top = (
-    <View>
+    <View style={s.topContainer}>
       <View style={s.actions}>
-        <Pressable style={s.pill} onPress={() => router.push('/feedback')}>
-          <Text style={s.pillText}>💬 Feedback</Text>
+        <Pressable
+          style={s.pillGhost}
+          onPress={() => router.push('/feedback')}
+          hitSlop={6}
+        >
+          <Text style={s.pillGhostText}>💬 Feedback</Text>
         </Pressable>
-        <Pressable style={s.pill} onPress={() => sendTestReminder('lunch')}>
-          <Text style={s.pillText}>🔔 Test reminder</Text>
+        <Pressable
+          style={s.pillGhost}
+          onPress={() => sendTestReminder('lunch')}
+          hitSlop={6}
+        >
+          <Text style={s.pillGhostText}>🔔 Test reminder</Text>
         </Pressable>
       </View>
+
       {pendingCount > 0 && (
         <View style={s.banner}>
-          <Text style={{ color: C.warnText, fontWeight: '600' }}>
-            ⏳ {pendingCount} rating{pendingCount > 1 ? 's' : ''} saved offline. Will sync when you're back online.
+          <Text style={s.bannerText}>
+            ⏳ {pendingCount} rating{pendingCount > 1 ? 's' : ''} saved offline. Will sync automatically.
           </Text>
         </View>
+      )}
+
+      {meals.length > 0 && (
+        <Text style={s.sectionHeader}>TODAY'S SCHEDULE</Text>
       )}
     </View>
   );
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={s.container}>
       <Header
         title="Today's Mess"
         subtitle={`${greet} · ${date}`}
-        pad={48}
         right={
-          <Pressable style={s.signout} onPress={() => supabase.auth.signOut()} hitSlop={8}>
-            <Text style={{ color: '#fff', fontWeight: '600', fontSize: 12 }}>Sign out</Text>
+          <Pressable
+            style={s.signout}
+            onPress={() => supabase.auth.signOut()}
+            hitSlop={8}
+          >
+            <Text style={s.signoutText}>Sign out</Text>
           </Pressable>
         }
       />
 
       {loading ? (
-        <View style={s.center}><ActivityIndicator size="large" color={C.primary} /></View>
+        <View style={s.center}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+        </View>
       ) : (
         <FlatList
-          style={{ flex: 1, marginTop: -26 }}
-          contentContainerStyle={{ padding: 20, paddingTop: 0, paddingBottom: 30 }}
+          style={s.list}
+          contentContainerStyle={s.listContent}
           data={meals}
           keyExtractor={(m) => m.id}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.primary} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={COLORS.primary}
+            />
+          }
           ListHeaderComponent={top}
           ListEmptyComponent={
             <Text style={s.empty}>
@@ -137,41 +200,76 @@ export default function Today() {
             const sc = scores[item.id];
             const my = mine[item.id] ?? pending[item.id];
             const isPending = !mine[item.id] && !!pending[item.id];
-            const cc = sc ? chipColors(Number(sc.avg_stars)) : { bg: '#F3F4F6', fg: C.muted };
+            const isActive = item.id === activeMealId && !my;
+            const isNonVeg = isMealNonVeg(item.menu_items);
+            const mealTitle = item.meal_type[0].toUpperCase() + item.meal_type.slice(1);
+            const mainDish = item.menu_items[0] || mealTitle;
+            const otherItems = item.menu_items.slice(1);
+
             return (
-              <Card>
-                <View style={s.row}>
-                  <View style={s.iconWrap}><Text style={{ fontSize: 22 }}>{EMOJI[item.meal_type]}</Text></View>
-                  <Text style={s.mealName}>
-                    {item.meal_type[0].toUpperCase() + item.meal_type.slice(1)}
-                  </Text>
-                  <View style={[s.chip, { backgroundColor: cc.bg }]}>
-                    <Text style={[s.chipText, { color: cc.fg }]}>
-                      {sc ? `★ ${sc.avg_stars} · ${sc.n}` : 'No score yet'}
-                    </Text>
+              <Card
+                elevated={isActive}
+                variant={my ? 'subtle' : 'bordered'}
+                style={[s.cardWrapper, isActive ? s.activeCard : s.mutedCard]}
+              >
+                {/* Header row: veg dot + title + rating badge */}
+                <View style={GLOBAL_STYLES.rowBetween}>
+                  <View style={[GLOBAL_STYLES.rowStart, { flex: 1, marginRight: SPACING.sm }]}>
+                    <VegDot isVeg={!isNonVeg} style={{ marginRight: SPACING.sm }} />
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={isActive ? TYPOGRAPHY.h2 : TYPOGRAPHY.h3}
+                        numberOfLines={1}
+                      >
+                        {mainDish}
+                      </Text>
+                      <Text style={s.mealMeta}>
+                        {EMOJI[item.meal_type]} {mealTitle} · {TIMINGS[item.meal_type] || 'Standard timings'}
+                      </Text>
+                    </View>
                   </View>
+
+                  {sc && sc.avg_stars > 0 ? (
+                    <View style={s.scoreChip}>
+                      <Text style={s.scoreChipText}>
+                        ★ {Number(sc.avg_stars).toFixed(1)}
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
 
-                <Text style={s.items}>{item.menu_items.join(' • ')}</Text>
+                {/* Secondary items list */}
+                {otherItems.length > 0 ? (
+                  <Text style={s.menuDetails} numberOfLines={2}>
+                    {otherItems.join(' • ')}
+                  </Text>
+                ) : null}
 
-                {my ? (
-                  <PrimaryButton
-                    variant="done"
-                    label={
-                      (my.skipped ? '✓ Marked as skipped' : `✓ You rated ${'★'.repeat(my.stars ?? 0)}`) +
-                      (isPending ? '  (syncing…)' : '')
-                    }
-                    style={{ minHeight: 46 }}
-                  />
-                ) : (
-                  <PrimaryButton
-                    label="Rate this meal"
-                    style={{ minHeight: 46 }}
-                    onPress={() =>
-                      router.push({ pathname: '/rate', params: { mealId: item.id, mealType: item.meal_type } })
-                    }
-                  />
-                )}
+                {/* CTA / status row */}
+                <View style={s.ctaContainer}>
+                  {my ? (
+                    <View style={GLOBAL_STYLES.successBadge}>
+                      <Text style={GLOBAL_STYLES.successBadgeText}>
+                        {my.skipped
+                          ? 'Marked as skipped ✓'
+                          : `Rated ${'★'.repeat(my.stars ?? 0)} ✓`}
+                        {isPending ? ' (syncing…)' : ''}
+                      </Text>
+                    </View>
+                  ) : (
+                    <PrimaryButton
+                      label="Rate this meal"
+                      variant={isActive ? 'primary' : 'soft'}
+                      style={{ minHeight: isActive ? 46 : 40 }}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/rate',
+                          params: { mealId: item.id, mealType: item.meal_type },
+                        })
+                      }
+                    />
+                  )}
+                </View>
               </Card>
             );
           }}
@@ -182,23 +280,111 @@ export default function Today() {
 }
 
 const s = StyleSheet.create({
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  signout: { backgroundColor: 'rgba(255,255,255,0.16)', borderRadius: 16, paddingHorizontal: 12, paddingVertical: 7 },
-  actions: { flexDirection: 'row', gap: 10, marginBottom: 14 },
-  pill: {
-    backgroundColor: C.card, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 9,
-    borderWidth: 1, borderColor: C.border,
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
   },
-  pillText: { color: C.primary, fontWeight: '700', fontSize: 13 },
-  banner: { backgroundColor: C.warnSoft, borderRadius: 14, padding: 12, marginBottom: 14 },
-  empty: { textAlign: 'center', color: C.muted, marginTop: 60, lineHeight: 22 },
-  row: { flexDirection: 'row', alignItems: 'center' },
-  iconWrap: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: C.primarySoft,
-    alignItems: 'center', justifyContent: 'center', marginRight: 12,
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  mealName: { flex: 1, fontSize: 18, fontWeight: '800', color: C.text },
-  chip: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 },
-  chipText: { fontWeight: '700', fontSize: 12 },
-  items: { color: C.muted, marginVertical: 12, lineHeight: 20 },
+  list: {
+    flex: 1,
+  },
+  listContent: {
+    paddingHorizontal: SPACING.md,
+    paddingBottom: SPACING.xl,
+  },
+  topContainer: {
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.md,
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    marginBottom: SPACING.md,
+  },
+  pillGhost: {
+    backgroundColor: COLORS.surfaceSubtle,
+    borderRadius: RADIUS.full,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+  },
+  pillGhostText: {
+    color: COLORS.textSecondary,
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  signout: {
+    backgroundColor: COLORS.surfaceSubtle,
+    borderRadius: RADIUS.full,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 6,
+  },
+  signoutText: {
+    color: COLORS.textSecondary,
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  banner: {
+    backgroundColor: COLORS.primaryLight,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
+  },
+  bannerText: {
+    color: COLORS.primary,
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  sectionHeader: {
+    ...TYPOGRAPHY.caption,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    color: COLORS.textMuted,
+    marginBottom: SPACING.sm,
+  },
+  empty: {
+    textAlign: 'center',
+    color: COLORS.textMuted,
+    marginTop: SPACING.xxl,
+    lineHeight: 22,
+    fontSize: 14,
+  },
+  cardWrapper: {
+    marginBottom: SPACING.md,
+  },
+  activeCard: {
+    marginBottom: SPACING.lg,
+  },
+  mutedCard: {
+    opacity: 0.95,
+  },
+  mealMeta: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textMuted,
+    marginTop: 2,
+  },
+  scoreChip: {
+    backgroundColor: COLORS.surfaceSubtle,
+    borderRadius: RADIUS.full,
+    paddingHorizontal: SPACING.sm + 2,
+    paddingVertical: SPACING.xs,
+    alignSelf: 'flex-start',
+  },
+  scoreChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.textSecondary,
+  },
+  menuDetails: {
+    ...TYPOGRAPHY.body,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.sm,
+    lineHeight: 20,
+  },
+  ctaContainer: {
+    marginTop: SPACING.md,
+  },
 });
