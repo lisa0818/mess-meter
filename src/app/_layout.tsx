@@ -1,7 +1,7 @@
 import NetInfo from '@react-native-community/netinfo';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, useRootNavigationState, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   DeviceEventEmitter,
@@ -10,8 +10,12 @@ import {
   ToastAndroid,
   View,
 } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 import { AuthProvider, useAuth } from '../lib/auth';
+import { ThemeProvider, useTheme } from '../theme/ThemeContext';
 import { setupReminders, useNotificationTap } from '../lib/notifications';
+import { hasCompletedOnboarding } from '../lib/onboarding';
 import { flushQueue } from '../lib/ratings';
 import { supabase } from '../lib/supabase';
 import { COLORS } from '../theme/designSystem';
@@ -19,23 +23,62 @@ import { todayStr } from '../lib/utils';
 
 function Gate() {
   const { session, hostelId, loading } = useAuth();
+  const { isDark, colors } = useTheme();
+  const rootNavigationState = useRootNavigationState();
   const segments = useSegments();
   const router = useRouter();
   const lastResponse = useNotificationTap();
   const handled = useRef<string | null>(null);
   const uid = session?.user.id;
 
+  const [onboardingChecked, setOnboardingChecked] = useState(false);
+  const [seenOnboarding, setSeenOnboarding] = useState(false);
+
   useEffect(() => {
-    if (loading) return;
+    hasCompletedOnboarding().then((done) => {
+      setSeenOnboarding(done);
+      setOnboardingChecked(true);
+    });
+
+    const sub = DeviceEventEmitter.addListener('onboarding-completed', () => {
+      setSeenOnboarding(true);
+    });
+    return () => sub.remove();
+  }, []);
+
+  useEffect(() => {
+    // Ensure the root navigation container is mounted and hydrated before redirecting
+    if (!rootNavigationState?.key || loading || !onboardingChecked) return;
+
     const seg = segments[0] as string | undefined;
-    if (!session) {
-      if (seg !== 'login') router.replace('/login');
+    let target: string | null = null;
+
+    if (!seenOnboarding) {
+      if (seg !== 'onboarding') {
+        target = '/onboarding';
+      }
+    } else if (seg === 'onboarding') {
+      // If user is currently on onboarding, allow onboarding.tsx to handle its own navigation
+      return;
+    } else if (!session) {
+      if (seg !== 'login') {
+        target = '/login';
+      }
     } else if (!hostelId) {
-      if (seg !== 'join') router.replace('/join');
+      if (seg !== 'join') {
+        target = '/join';
+      }
     } else if (seg === 'login' || seg === 'join') {
-      router.replace('/');
+      target = '/';
     }
-  }, [session, hostelId, loading, segments]);
+
+    if (target) {
+      const timer = setTimeout(() => {
+        router.replace(target as any);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [rootNavigationState?.key, session, hostelId, loading, onboardingChecked, seenOnboarding, segments]);
 
   useEffect(() => {
     if (uid && hostelId) setupReminders().catch(() => {});
@@ -85,11 +128,12 @@ function Gate() {
   }, [lastResponse, uid, hostelId]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: COLORS.background }}>
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: COLORS.background } }} />
-      {loading && (
-        <View style={s.overlay}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }} />
+      {(loading || !onboardingChecked) && (
+        <View style={[s.overlay, { backgroundColor: colors.background }]}>
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       )}
     </View>
@@ -98,10 +142,15 @@ function Gate() {
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <StatusBar style="dark" />
-      <Gate />
-    </AuthProvider>
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <ErrorBoundary>
+          <AuthProvider>
+            <Gate />
+          </AuthProvider>
+        </ErrorBoundary>
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 }
 

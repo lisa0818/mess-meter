@@ -2,18 +2,22 @@ import NetInfo from '@react-native-community/netinfo';
 import { decode } from 'base64-arraybuffer';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   Alert,
+  Animated,
   Image,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { BackLink, Card, Header, PrimaryButton } from '../components/ui';
 import { useAuth } from '../lib/auth';
+import { haptic } from '../lib/haptics';
+import { useTheme } from '../theme/ThemeContext';
 import { submitRating } from '../lib/ratings';
 import { supabase } from '../lib/supabase';
 import {
@@ -28,21 +32,64 @@ const TAGS = ['Great taste', 'Undercooked', 'Too oily', 'Too salty', 'Cold', 'Sm
 const POSITIVE = ['Great taste'];
 const WORDS = ['Tap a star', 'Poor', 'Okay', 'Good', 'Great', 'Loved it'];
 
+function StarItem({
+  n,
+  active,
+  disabled,
+  onPress,
+}: {
+  n: number;
+  active: boolean;
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  const { colors } = useTheme();
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const handlePress = () => {
+    if (disabled) return;
+    haptic.light();
+    Animated.sequence([
+      Animated.timing(scale, { toValue: 1.35, duration: 90, useNativeDriver: true }),
+      Animated.spring(scale, { toValue: 1, friction: 4, tension: 120, useNativeDriver: true }),
+    ]).start();
+    onPress();
+  };
+
+  return (
+    <Pressable onPress={handlePress} hitSlop={8} style={s.starTouch} disabled={disabled}>
+      <Animated.Text
+        style={[
+          s.starGlyph,
+          { color: active ? colors.star : colors.border, transform: [{ scale }] },
+        ]}
+      >
+        ★
+      </Animated.Text>
+    </Pressable>
+  );
+}
+
 export default function Rate() {
   const { mealId, mealType } = useLocalSearchParams<{ mealId: string; mealType: string }>();
   const router = useRouter();
   const { session } = useAuth();
+  const { isDark, colors } = useTheme();
   const [stars, setStars] = useState(0);
   const [tags, setTags] = useState<string[]>([]);
+  const [comment, setComment] = useState('');
   const [skipped, setSkipped] = useState(false);
   const [photo, setPhoto] = useState<{ uri: string; base64: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<null | 'sent' | 'queued'>(null);
 
-  const toggleTag = (t: string) =>
+  const toggleTag = (t: string) => {
+    haptic.selection();
     setTags((p) => (p.includes(t) ? p.filter((x) => x !== t) : [...p, t]));
+  };
 
   const takePhoto = async () => {
+    haptic.light();
     const perm = await ImagePicker.requestCameraPermissionsAsync();
     if (!perm.granted) {
       Alert.alert('Camera permission needed', 'Allow camera access to attach a plate photo.');
@@ -56,11 +103,13 @@ export default function Rate() {
 
   const submit = async () => {
     if (!skipped && stars === 0) {
+      haptic.warning();
       Alert.alert('Pick a rating', 'Tap a star first, or choose "I skipped this meal".');
       return;
     }
     const uid = session?.user.id;
     if (!uid) return;
+    haptic.medium();
     setBusy(true);
 
     try {
@@ -81,12 +130,16 @@ export default function Rate() {
         user_id: uid,
         stars: skipped ? null : stars,
         tags: skipped ? [] : tags,
+        comment: skipped ? null : (comment.trim() || null),
         skipped,
         photo_url: photoPath,
       });
+
+      haptic.success();
       setDone(res.queued ? 'queued' : 'sent');
       setTimeout(() => router.back(), 1400);
     } catch (e: any) {
+      haptic.warning();
       if (e?.message === 'ALREADY_RATED') {
         Alert.alert('Already rated', 'You have already rated this meal.', [
           { text: 'OK', onPress: () => router.back() },
@@ -101,20 +154,20 @@ export default function Rate() {
 
   if (done) {
     return (
-      <View style={s.center}>
+      <View style={[s.center, { backgroundColor: colors.background }]}>
         <View
           style={[
             s.bigIcon,
-            { backgroundColor: done === 'queued' ? COLORS.primaryLight : '#DCFCE7' },
+            { backgroundColor: done === 'queued' ? colors.primaryLight : isDark ? '#064E3B' : '#DCFCE7' },
           ]}
         >
           <Text style={{ fontSize: 48 }}>{done === 'queued' ? '⏳' : '✓'}</Text>
         </View>
-        <Text style={[TYPOGRAPHY.h2, { marginTop: SPACING.lg, textAlign: 'center' }]}>
+        <Text style={[TYPOGRAPHY.h2, { marginTop: SPACING.lg, textAlign: 'center', color: colors.textMain }]}>
           {done === 'queued' ? 'Saved offline' : 'Thanks! Your voice counts.'}
         </Text>
         {done === 'queued' && (
-          <Text style={[TYPOGRAPHY.body, { color: COLORS.textMuted, marginTop: SPACING.xs, textAlign: 'center' }]}>
+          <Text style={[TYPOGRAPHY.body, { color: colors.textMuted, marginTop: SPACING.xs, textAlign: 'center' }]}>
             We'll send it automatically when you're back online.
           </Text>
         )}
@@ -125,7 +178,7 @@ export default function Rate() {
   const titleMeal = mealType ? mealType[0].toUpperCase() + mealType.slice(1) : 'Meal';
 
   return (
-    <View style={s.screen}>
+    <View style={[s.screen, { backgroundColor: colors.background }]}>
       <Header
         title={`How was ${titleMeal}?`}
         subtitle="10 seconds · anonymous"
@@ -141,29 +194,21 @@ export default function Rate() {
         <Card elevated style={[s.starCard, skipped && { opacity: 0.35 }]}>
           <View style={s.starsRow}>
             {[1, 2, 3, 4, 5].map((n) => (
-              <Pressable
+              <StarItem
                 key={n}
-                onPress={() => !skipped && setStars(n)}
-                hitSlop={8}
-                style={s.starTouch}
-              >
-                <Text
-                  style={[
-                    s.starGlyph,
-                    { color: n <= stars ? COLORS.star : COLORS.border },
-                  ]}
-                >
-                  ★
-                </Text>
-              </Pressable>
+                n={n}
+                active={n <= stars}
+                disabled={skipped}
+                onPress={() => setStars(n)}
+              />
             ))}
           </View>
-          <Text style={s.wordLabel}>{WORDS[stars]}</Text>
+          <Text style={[s.wordLabel, { color: colors.textSecondary }]}>{WORDS[stars]}</Text>
         </Card>
 
         {/* Feedback Tags */}
         <View style={s.sectionWrap}>
-          <Text style={s.sectionTitle}>What stood out? (optional)</Text>
+          <Text style={[s.sectionTitle, { color: colors.textMain }]}>What stood out? (optional)</Text>
           <View
             style={[s.tagWrap, skipped && { opacity: 0.35 }]}
             pointerEvents={skipped ? 'none' : 'auto'}
@@ -177,13 +222,15 @@ export default function Rate() {
                   onPress={() => toggleTag(t)}
                   style={[
                     s.tagPill,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
                     on && (isPositive ? s.tagPillPositive : s.tagPillNegative),
                   ]}
                 >
                   <Text
                     style={[
                       s.tagPillText,
-                      on && { color: COLORS.textInverse, fontWeight: '700' },
+                      { color: on ? COLORS.textInverse : colors.textMain },
+                      on && { fontWeight: '700' },
                     ]}
                   >
                     {t}
@@ -194,6 +241,33 @@ export default function Rate() {
           </View>
         </View>
 
+        {/* Optional Free-Text Comment */}
+        <View
+          style={[s.sectionWrap, skipped && { opacity: 0.35 }]}
+          pointerEvents={skipped ? 'none' : 'auto'}
+        >
+          <View style={[GLOBAL_STYLES.rowBetween, { marginBottom: SPACING.xs }]}>
+            <Text style={[s.sectionTitle, { color: colors.textMain }]}>Add a note (optional)</Text>
+            <Text style={[TYPOGRAPHY.caption, { color: colors.textMuted }]}>
+              {comment.length}/140
+            </Text>
+          </View>
+          <TextInput
+            style={[
+              s.commentInput,
+              { backgroundColor: colors.surface, borderColor: colors.border, color: colors.textMain },
+            ]}
+            placeholder="e.g. Chapati was cold, loved the dessert..."
+            placeholderTextColor={colors.textMuted}
+            value={comment}
+            onChangeText={(t) => setComment(t.slice(0, 140))}
+            multiline
+            numberOfLines={3}
+            maxLength={140}
+            editable={!skipped && !busy}
+          />
+        </View>
+
         {/* Optional Photo */}
         <View
           style={[s.sectionWrap, skipped && { opacity: 0.35 }]}
@@ -202,13 +276,22 @@ export default function Rate() {
           {photo ? (
             <View style={s.photoRow}>
               <Image source={{ uri: photo.uri }} style={s.thumb} />
-              <Pressable onPress={() => setPhoto(null)} hitSlop={10}>
+              <Pressable
+                onPress={() => {
+                  haptic.light();
+                  setPhoto(null);
+                }}
+                hitSlop={10}
+              >
                 <Text style={s.removePhotoText}>Remove photo</Text>
               </Pressable>
             </View>
           ) : (
-            <Pressable style={s.photoBtn} onPress={takePhoto}>
-              <Text style={s.photoBtnText}>📷  Add a plate photo (optional)</Text>
+            <Pressable
+              style={[s.photoBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              onPress={takePhoto}
+            >
+              <Text style={[s.photoBtnText, { color: colors.textMuted }]}>📷  Add a plate photo (optional)</Text>
             </Pressable>
           )}
         </View>
@@ -217,10 +300,12 @@ export default function Rate() {
         <Pressable
           style={s.skipRow}
           onPress={() => {
+            haptic.selection();
             setSkipped(!skipped);
             if (!skipped) {
               setStars(0);
               setTags([]);
+              setComment('');
               setPhoto(null);
             }
           }}
@@ -228,12 +313,13 @@ export default function Rate() {
           <View
             style={[
               s.checkbox,
-              skipped && { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+              { backgroundColor: colors.surface, borderColor: colors.border },
+              skipped && { backgroundColor: colors.primary, borderColor: colors.primary },
             ]}
           >
             {skipped ? <Text style={s.checkmark}>✓</Text> : null}
           </View>
-          <Text style={s.skipText}>I skipped this meal</Text>
+          <Text style={[s.skipText, { color: colors.textSecondary }]}>I skipped this meal</Text>
         </Pressable>
 
         {/* Single Primary CTA */}
@@ -326,6 +412,17 @@ const s = StyleSheet.create({
     ...TYPOGRAPHY.body,
     fontSize: 13,
     color: COLORS.textMain,
+  },
+  commentInput: {
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    ...TYPOGRAPHY.body,
+    color: COLORS.textMain,
+    minHeight: 76,
+    textAlignVertical: 'top',
   },
   photoBtn: {
     borderWidth: 1,

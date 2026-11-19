@@ -11,7 +11,9 @@ import {
 } from 'react-native';
 import { BarChart, LineChart } from 'react-native-gifted-charts';
 import { Card, Header } from '../../components/ui';
+import { TrendsScreenSkeleton } from '../../components/Skeleton';
 import { supabase } from '../../lib/supabase';
+import { useTheme } from '../../theme/ThemeContext';
 import {
   COLORS,
   GLOBAL_STYLES,
@@ -37,6 +39,7 @@ const ratingColor = (v: number) =>
   v >= 4 ? COLORS.success : v >= 3 ? COLORS.warning : COLORS.danger;
 
 export default function Trends() {
+  const { isDark, colors } = useTheme();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -63,8 +66,12 @@ export default function Trends() {
 
   if (loading) {
     return (
-      <View style={s.center}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+      <View style={[s.screen, { backgroundColor: colors.background }]}>
+        <Header
+          title="Weekly Trends"
+          subtitle="Mess satisfaction overview based on anonymous ratings"
+        />
+        <TrendsScreenSkeleton />
       </View>
     );
   }
@@ -96,7 +103,7 @@ export default function Trends() {
       label: cap(t),
       frontColor: ratingColor(v),
       topLabelComponent: () => (
-        <Text style={s.barTopLabel}>{v}</Text>
+        <Text style={[s.barTopLabel, { color: colors.textSecondary }]}>{v}</Text>
       ),
     };
   });
@@ -104,7 +111,7 @@ export default function Trends() {
   const worst = [...rows].sort((a, b) => a.avg_stars - b.avg_stars)[0];
 
   return (
-    <View style={s.screen}>
+    <View style={[s.screen, { backgroundColor: colors.background }]}>
       <Header
         title="Weekly Trends"
         subtitle="Mess satisfaction overview based on anonymous ratings"
@@ -116,7 +123,7 @@ export default function Trends() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            tintColor={COLORS.primary}
+            tintColor={colors.primary}
             onRefresh={async () => {
               setRefreshing(true);
               await load();
@@ -132,33 +139,33 @@ export default function Trends() {
         )}
 
         {!error && rows.length === 0 && (
-          <Text style={s.emptyNotice}>
+          <Text style={[s.emptyNotice, { color: colors.textMuted }]}>
             Not enough ratings yet. Scores appear once {MIN_RATINGS}+ students have rated a meal.
           </Text>
         )}
 
         {/* Actionable insight first: Lowest rated item with danger accent */}
         {worst && (
-          <View style={s.alertCard}>
+          <View style={[s.alertCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={s.alertLabel}>LOWEST RATED THIS WEEK</Text>
             <View style={[GLOBAL_STYLES.rowBetween, { marginTop: SPACING.xs }]}>
-              <Text style={TYPOGRAPHY.h3}>
+              <Text style={[TYPOGRAPHY.h3, { color: colors.textMain }]}>
                 {dayLabel(worst.meal_date)} · {cap(worst.meal_type)}
               </Text>
-              <View style={s.alertBadge}>
+              <View style={[s.alertBadge, { backgroundColor: isDark ? '#450A0A' : '#FEE2E2' }]}>
                 <Text style={s.alertBadgeText}>
                   ★ {Number(worst.avg_stars).toFixed(1)}
                 </Text>
               </View>
             </View>
-            <Text style={s.alertSub}>{worst.n} student ratings recorded</Text>
+            <Text style={[s.alertSub, { color: colors.textMuted }]}>{worst.n} student ratings recorded</Text>
           </View>
         )}
 
         {/* Daily Average Chart */}
         {line.length > 0 && (
           <Card variant="bordered" style={s.chartCard}>
-            <Text style={s.cardTitle}>Daily Average</Text>
+            <Text style={[s.cardTitle, { color: colors.textMain }]}>Daily Average</Text>
             <LineChart
               data={line}
               width={CHART_W}
@@ -167,16 +174,16 @@ export default function Trends() {
               noOfSections={5}
               spacing={Math.max(28, (CHART_W - 20) / Math.max(line.length, 1))}
               initialSpacing={12}
-              color={COLORS.primary}
+              color={colors.primary}
               thickness={2.5}
-              dataPointsColor={COLORS.primary}
+              dataPointsColor={colors.primary}
               curved
               isAnimated
-              rulesColor={COLORS.border}
-              yAxisColor={COLORS.border}
-              xAxisColor={COLORS.border}
-              yAxisTextStyle={s.axisLabel}
-              xAxisLabelTextStyle={s.axisLabel}
+              rulesColor={colors.border}
+              yAxisColor={colors.border}
+              xAxisColor={colors.border}
+              yAxisTextStyle={{ color: colors.textMuted, fontSize: 11 }}
+              xAxisLabelTextStyle={{ color: colors.textMuted, fontSize: 11 }}
             />
           </Card>
         )}
@@ -184,7 +191,7 @@ export default function Trends() {
         {/* Average by Meal Chart */}
         {bars.length > 0 && (
           <Card variant="bordered" style={s.chartCard}>
-            <Text style={s.cardTitle}>Average by Meal</Text>
+            <Text style={[s.cardTitle, { color: colors.textMain }]}>Average by Meal</Text>
             <BarChart
               data={bars}
               width={CHART_W}
@@ -198,9 +205,9 @@ export default function Trends() {
               yAxisThickness={0}
               xAxisThickness={0}
               isAnimated
-              rulesColor={COLORS.border}
-              yAxisTextStyle={s.axisLabel}
-              xAxisLabelTextStyle={s.axisLabel}
+              rulesColor={colors.border}
+              yAxisTextStyle={{ color: colors.textMuted, fontSize: 11 }}
+              xAxisLabelTextStyle={{ color: colors.textMuted, fontSize: 11 }}
             />
           </Card>
         )}

@@ -8,6 +8,8 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
+import { haptic } from '../lib/haptics';
+import { useTheme } from '../theme/ThemeContext';
 import {
   COLORS,
   GLOBAL_STYLES,
@@ -32,16 +34,22 @@ export function Header({
   children?: ReactNode;
   pad?: number;
 }) {
+  const { colors } = useTheme();
   return (
-    <View style={[styles.headerContainer, { paddingBottom: pad }]}>
+    <View style={[styles.headerContainer, { backgroundColor: colors.background, paddingBottom: pad }]}>
       {left ? <View style={styles.headerLeft}>{left}</View> : null}
       <View style={GLOBAL_STYLES.rowBetween}>
         <View style={{ flex: 1, marginRight: SPACING.sm }}>
-          <Text style={TYPOGRAPHY.h1} numberOfLines={1}>
+          <Text
+            style={[TYPOGRAPHY.h1, { color: colors.textMain }]}
+            numberOfLines={1}
+          >
             {title}
           </Text>
           {subtitle ? (
-            <Text style={[TYPOGRAPHY.caption, { marginTop: SPACING.xs }]}>
+            <Text
+              style={[TYPOGRAPHY.caption, { marginTop: SPACING.xs, color: colors.textSecondary }]}
+            >
               {subtitle}
             </Text>
           ) : null}
@@ -54,9 +62,10 @@ export function Header({
 }
 
 export function BackLink({ onPress }: { onPress: () => void }) {
+  const { colors } = useTheme();
   return (
     <Pressable onPress={onPress} hitSlop={12} style={styles.backLink}>
-      <Text style={styles.backLinkText}>← Back</Text>
+      <Text style={[styles.backLinkText, { color: colors.primary }]}>← Back</Text>
     </Pressable>
   );
 }
@@ -76,10 +85,18 @@ export function Card({
   muted?: boolean;
   onPress?: () => void;
 }) {
+  const { colors } = useTheme();
   const chosenVariant = elevated ? 'elevated' : muted ? 'subtle' : variant;
+
+  const dynamicBg: ViewStyle = {
+    backgroundColor:
+      chosenVariant === 'subtle' ? colors.surfaceSubtle : colors.surface,
+    borderColor: colors.border,
+  };
 
   const cardStyle: StyleProp<ViewStyle> = [
     styles.cardBase,
+    dynamicBg,
     chosenVariant === 'elevated' && styles.cardElevated,
     chosenVariant === 'bordered' && styles.cardBordered,
     chosenVariant === 'subtle' && styles.cardSubtle,
@@ -88,7 +105,16 @@ export function Card({
 
   if (onPress) {
     return (
-      <Pressable onPress={onPress} style={({ pressed }) => [cardStyle, pressed && { opacity: 0.9 }]}>
+      <Pressable
+        onPress={() => {
+          haptic.light();
+          onPress();
+        }}
+        style={({ pressed }) => [
+          cardStyle,
+          pressed && { opacity: 0.92, transform: [{ scale: 0.99 }] },
+        ]}
+      >
         {children}
       </Pressable>
     );
@@ -110,37 +136,49 @@ export function PrimaryButton({
   variant?: 'primary' | 'soft' | 'secondary' | 'done' | 'ghost';
   style?: StyleProp<ViewStyle>;
 }) {
+  const { isDark, colors } = useTheme();
   const isDone = variant === 'done';
   const isPrimary = variant === 'primary';
 
-  let containerStyle: StyleProp<ViewStyle> = styles.btnPrimary;
-  let textStyle = styles.btnTextPrimary;
+  let containerStyle: StyleProp<ViewStyle> = [styles.btnPrimary, { backgroundColor: colors.primary }];
+  let textStyle: any = [styles.btnTextPrimary, { color: colors.textInverse }];
 
   if (isPrimary) {
-    containerStyle = styles.btnPrimary;
-    textStyle = styles.btnTextPrimary;
+    containerStyle = [styles.btnPrimary, { backgroundColor: colors.primary }];
+    textStyle = [styles.btnTextPrimary, { color: colors.textInverse }];
   } else if (isDone) {
-    containerStyle = styles.btnDone;
-    textStyle = styles.btnTextDone;
+    containerStyle = [
+      styles.btnDone,
+      { backgroundColor: isDark ? '#064E3B' : '#DCFCE7' },
+    ];
+    textStyle = [styles.btnTextDone, { color: colors.success }];
   } else {
     // soft, secondary, ghost
-    containerStyle = styles.btnGhost;
-    textStyle = styles.btnTextGhost;
+    containerStyle = [styles.btnGhost, { backgroundColor: colors.surfaceSubtle }];
+    textStyle = [styles.btnTextGhost, { color: colors.textSecondary }];
   }
+
+  const handlePress = () => {
+    if (onPress) {
+      if (isPrimary) haptic.light();
+      else haptic.selection();
+      onPress();
+    }
+  };
 
   return (
     <Pressable
-      onPress={onPress}
+      onPress={handlePress}
       disabled={busy || isDone}
       style={({ pressed }) => [
         containerStyle,
-        pressed && !isDone ? { opacity: 0.85 } : null,
+        pressed && !isDone ? { opacity: 0.88, transform: [{ scale: 0.98 }] } : null,
         busy ? { opacity: 0.6 } : null,
         style,
       ]}
     >
       {busy ? (
-        <ActivityIndicator color={isPrimary ? COLORS.textInverse : COLORS.primary} size="small" />
+        <ActivityIndicator color={isPrimary ? colors.textInverse : colors.primary} size="small" />
       ) : (
         <Text style={textStyle}>{label}</Text>
       )}
@@ -157,6 +195,7 @@ export function VegDot({
   size?: number;
   style?: StyleProp<ViewStyle>;
 }) {
+  const { colors } = useTheme();
   return (
     <View
       style={[
@@ -164,7 +203,7 @@ export function VegDot({
           width: size,
           height: size,
           borderRadius: size / 2,
-          backgroundColor: isVeg ? COLORS.success : COLORS.danger,
+          backgroundColor: isVeg ? colors.success : colors.danger,
         },
         style,
       ]}
@@ -183,10 +222,11 @@ export function StatCard({
   accent?: string;
   style?: StyleProp<ViewStyle>;
 }) {
+  const { colors } = useTheme();
   return (
-    <View style={[styles.statCard, style]}>
-      <Text style={styles.statLabel}>{label}</Text>
-      <Text style={[TYPOGRAPHY.statNumber, accent ? { color: accent } : null]}>
+    <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }, style]}>
+      <Text style={[styles.statLabel, { color: colors.textMuted }]}>{label}</Text>
+      <Text style={[TYPOGRAPHY.statNumber, { color: accent || colors.secondary }]}>
         {value}
       </Text>
     </View>
@@ -212,14 +252,22 @@ export function PollOption({
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
+  const { colors } = useTheme();
   return (
     <Pressable
-      onPress={onSelect}
+      onPress={() => {
+        haptic.selection();
+        onSelect?.();
+      }}
       disabled={disabled}
       style={({ pressed }) => [
         styles.pollOptionContainer,
+        {
+          backgroundColor: selected ? colors.primaryLight : colors.surface,
+          borderColor: selected ? colors.primary : colors.border,
+        },
         selected ? styles.pollOptionSelected : styles.pollOptionUnselected,
-        pressed && !disabled ? { opacity: 0.88 } : null,
+        pressed && !disabled ? { opacity: 0.9, transform: [{ scale: 0.99 }] } : null,
         style,
       ]}
     >
@@ -229,7 +277,7 @@ export function PollOption({
           <Text
             style={[
               selected ? TYPOGRAPHY.bodyBold : TYPOGRAPHY.body,
-              { color: selected ? COLORS.textMain : COLORS.textSecondary, flex: 1 },
+              { color: selected ? colors.textMain : colors.textSecondary, flex: 1 },
             ]}
             numberOfLines={1}
           >
@@ -240,7 +288,7 @@ export function PollOption({
           <Text
             style={[
               TYPOGRAPHY.bodyBold,
-              { color: selected ? COLORS.primary : COLORS.textMain },
+              { color: selected ? colors.primary : colors.textMain },
             ]}
           >
             {Math.round(votesPercentage)}%
@@ -249,17 +297,19 @@ export function PollOption({
       </View>
 
       {subtitle ? (
-        <Text style={[TYPOGRAPHY.caption, { marginTop: SPACING.xs }]}>{subtitle}</Text>
+        <Text style={[TYPOGRAPHY.caption, { color: colors.textMuted, marginTop: SPACING.xs }]}>
+          {subtitle}
+        </Text>
       ) : null}
 
       {votesPercentage !== undefined ? (
-        <View style={[GLOBAL_STYLES.progressBarTrack, { marginTop: SPACING.sm }]}>
+        <View style={[GLOBAL_STYLES.progressBarTrack, { backgroundColor: colors.surfaceSubtle, marginTop: SPACING.sm }]}>
           <View
             style={[
               GLOBAL_STYLES.progressBarFill,
               {
                 width: `${Math.min(100, Math.max(0, votesPercentage))}%`,
-                backgroundColor: selected ? COLORS.primary : COLORS.border,
+                backgroundColor: selected ? colors.primary : colors.border,
               },
             ]}
           />
@@ -294,6 +344,7 @@ export function MealCard({
   isVeg?: boolean;
   onRate?: () => void;
 }) {
+  const { colors } = useTheme();
   const title = dishName || (mealType[0].toUpperCase() + mealType.slice(1));
 
   return (
@@ -304,7 +355,10 @@ export function MealCard({
       <View style={[GLOBAL_STYLES.rowBetween, { marginBottom: SPACING.xs }]}>
         <View style={[GLOBAL_STYLES.rowStart, { flex: 1, marginRight: SPACING.sm }]}>
           {isVeg !== undefined ? <VegDot isVeg={isVeg} style={{ marginRight: SPACING.sm }} /> : null}
-          <Text style={isActive ? TYPOGRAPHY.h2 : TYPOGRAPHY.h3} numberOfLines={1}>
+          <Text
+            style={[isActive ? TYPOGRAPHY.h2 : TYPOGRAPHY.h3, { color: colors.textMain }]}
+            numberOfLines={1}
+          >
             {title}
           </Text>
         </View>
@@ -319,11 +373,13 @@ export function MealCard({
       </View>
 
       {timing ? (
-        <Text style={[TYPOGRAPHY.caption, { marginBottom: SPACING.xs }]}>{timing}</Text>
+        <Text style={[TYPOGRAPHY.caption, { color: colors.textMuted, marginBottom: SPACING.xs }]}>
+          {timing}
+        </Text>
       ) : null}
 
       {items.length > 0 ? (
-        <Text style={[TYPOGRAPHY.body, { marginTop: SPACING.xs, marginBottom: SPACING.md }]}>
+        <Text style={[TYPOGRAPHY.body, { color: colors.textSecondary, marginTop: SPACING.xs, marginBottom: SPACING.md }]}>
           {items.join(' • ')}
         </Text>
       ) : null}
@@ -362,26 +418,20 @@ const styles = StyleSheet.create({
   backLinkText: {
     fontSize: 14,
     fontWeight: '600',
-    color: COLORS.textSecondary,
+    color: COLORS.primary,
   },
   cardBase: {
     borderRadius: RADIUS.md,
     padding: SPACING.md,
   },
   cardElevated: {
-    backgroundColor: COLORS.surface,
     ...SHADOWS.card,
   },
   cardBordered: {
-    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: COLORS.border,
   },
-  cardSubtle: {
-    backgroundColor: COLORS.surfaceSubtle,
-  },
+  cardSubtle: {},
   btnPrimary: {
-    backgroundColor: COLORS.primary,
     borderRadius: RADIUS.md,
     minHeight: 46,
     paddingHorizontal: SPACING.lg,
@@ -389,12 +439,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   btnTextPrimary: {
-    color: COLORS.textInverse,
     fontSize: 15,
     fontWeight: '600',
   },
   btnGhost: {
-    backgroundColor: COLORS.surfaceSubtle,
     borderRadius: RADIUS.md,
     minHeight: 44,
     paddingHorizontal: SPACING.md,
@@ -402,12 +450,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   btnTextGhost: {
-    color: COLORS.textSecondary,
     fontSize: 14,
     fontWeight: '600',
   },
   btnDone: {
-    backgroundColor: '#DCFCE7',
     borderRadius: RADIUS.full,
     minHeight: 38,
     paddingHorizontal: SPACING.md,
@@ -416,17 +462,14 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   btnTextDone: {
-    color: COLORS.success,
     fontSize: 13,
     fontWeight: '600',
   },
   statCard: {
     flex: 1,
-    backgroundColor: COLORS.surface,
     borderRadius: RADIUS.md,
     padding: SPACING.md,
     borderWidth: 1,
-    borderColor: COLORS.border,
   },
   statLabel: {
     ...TYPOGRAPHY.caption,
@@ -440,13 +483,9 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
   },
   pollOptionUnselected: {
-    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: COLORS.border,
   },
   pollOptionSelected: {
-    backgroundColor: COLORS.primaryLight,
     borderWidth: 1.5,
-    borderColor: COLORS.primary,
   },
 });

@@ -1,6 +1,6 @@
 import { Platform, StyleSheet } from 'react-native';
 
-export const COLORS = {
+export const COLORS_LIGHT = {
   // Brand Colors
   primary: '#FF6B35',      // Appetizing Warm Orange (Buttons, Active Votes, Highlights)
   primaryLight: '#FFF0EB', // Soft Orange Tint (Selected Meal Cards, Badges)
@@ -26,6 +26,35 @@ export const COLORS = {
   border: '#E2E8F0',       // Card dividers & Input borders
 };
 
+export const COLORS_DARK = {
+  // Brand Colors
+  primary: '#FF7A45',      // Vibrant Warm Orange
+  primaryLight: '#2D1A12', // Deep warm tinted surface
+  secondary: '#818CF8',    // Bright Indigo
+  secondaryLight: '#1E1B4B', // Deep indigo tinted surface
+
+  // Backgrounds & Surfaces
+  background: '#0B0F19',   // Deep slate black
+  surface: '#151D2E',      // Elevated dark slate surface
+  surfaceSubtle: '#1E293B',// Slate subtle container / pill
+
+  // Typography Colors
+  textMain: '#F8FAFC',     // Crisp white / soft slate
+  textSecondary: '#94A3B8',// Light slate
+  textMuted: '#64748B',    // Muted slate
+  textInverse: '#FFFFFF',  // Text on buttons
+
+  // Semantic & Rating Colors
+  star: '#FBBF24',         // Bright Amber
+  success: '#34D399',      // Bright Emerald
+  danger: '#F87171',       // Bright Red
+  warning: '#FBBF24',      // Bright Amber
+  border: '#243048',       // Slate border
+};
+
+export const COLORS = COLORS_LIGHT;
+export type ColorPalette = typeof COLORS_LIGHT;
+
 export const SPACING = {
   xs: 4,
   sm: 8,
@@ -46,39 +75,32 @@ export const TYPOGRAPHY = StyleSheet.create({
   h1: {
     fontSize: 24,
     fontWeight: '700',
-    color: COLORS.textMain,
     letterSpacing: -0.5,
   },
   h2: {
     fontSize: 20,
     fontWeight: '700',
-    color: COLORS.textMain,
   },
   h3: {
     fontSize: 16,
     fontWeight: '600',
-    color: COLORS.textMain,
   },
   body: {
     fontSize: 14,
     fontWeight: '400',
-    color: COLORS.textSecondary,
     lineHeight: 20,
   },
   bodyBold: {
     fontSize: 14,
     fontWeight: '600',
-    color: COLORS.textMain,
   },
   caption: {
     fontSize: 12,
     fontWeight: '500',
-    color: COLORS.textMuted,
   },
   statNumber: {
     fontSize: 28,
     fontWeight: '800',
-    color: COLORS.secondary, // Used in Admin Dashboard KPI cards
   },
 });
 

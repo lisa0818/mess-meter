@@ -11,8 +11,11 @@ import {
   View,
 } from 'react-native';
 import { Card, Header, PrimaryButton, VegDot } from '../../components/ui';
+import { TodayScreenSkeleton } from '../../components/Skeleton';
 import { useAuth } from '../../lib/auth';
+import { useTheme } from '../../theme/ThemeContext';
 import { sendTestReminder } from '../../lib/notifications';
+import { getActivePolls, Poll } from '../../lib/polls';
 import { getQueue } from '../../lib/ratings';
 import { supabase } from '../../lib/supabase';
 import {
@@ -50,12 +53,14 @@ const isMealNonVeg = (items: string[]) => {
 
 export default function Today() {
   const router = useRouter();
-  const { session } = useAuth();
+  const { session, hostelId, email } = useAuth();
+  const { isDark, colors } = useTheme();
   const uid = session?.user.id;
   const [meals, setMeals] = useState<Meal[]>([]);
   const [scores, setScores] = useState<Record<string, Score>>({});
   const [mine, setMine] = useState<Record<string, Mine>>({});
   const [pending, setPending] = useState<Record<string, Mine>>({});
+  const [activePoll, setActivePoll] = useState<Poll | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,10 +70,11 @@ export default function Today() {
     setPending(Object.fromEntries(q.map((x) => [x.meal_id, { stars: x.stars, skipped: x.skipped }])));
 
     const today = todayStr();
-    const [m, s, r] = await Promise.all([
+    const [m, s, r, polls] = await Promise.all([
       supabase.from('meals').select('id, meal_type, menu_items').eq('meal_date', today),
       supabase.rpc('meal_scores', { p_from: today, p_min: MIN_RATINGS }),
       supabase.from('ratings').select('meal_id, stars, skipped'),
+      getActivePolls(hostelId).catch(() => []),
     ]);
 
     if (m.error || s.error || r.error) {
@@ -81,7 +87,10 @@ export default function Today() {
     );
     setScores(Object.fromEntries((s.data ?? []).map((x: Score) => [x.meal_id, x])));
     setMine(Object.fromEntries((r.data ?? []).map((x: any) => [x.meal_id, x])));
-  }, [uid]);
+    if (polls && polls.length > 0) {
+      setActivePoll(polls[0]);
+    }
+  }, [uid, hostelId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -91,7 +100,22 @@ export default function Today() {
 
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener('ratings-synced', () => load());
-    return () => sub.remove();
+    // Supabase Realtime subscription for live score updates
+    const channel = supabase
+      .channel('today-ratings-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'ratings' },
+        () => {
+          load();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      sub.remove();
+      supabase.removeChannel(channel);
+    };
   }, [load]);
 
   const onRefresh = async () => {
@@ -100,10 +124,18 @@ export default function Today() {
     setRefreshing(false);
   };
 
+  const [clientMounted, setClientMounted] = useState(false);
+  useEffect(() => {
+    setClientMounted(true);
+  }, []);
+
   const pendingCount = Object.keys(pending).length;
-  const hr = new Date().getHours();
+  const hr = clientMounted ? new Date().getHours() : 12;
   const greet = hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening';
-  const date = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short' });
+  const date = clientMounted
+    ? new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short' })
+    : '';
+  const headerSubtitle = clientMounted ? `${greet} · ${date} · Live` : "Today's Mess · Live";
 
   // Determine current active meal slot
   const currentSlot = useMemo(() => {
@@ -124,59 +156,86 @@ export default function Today() {
     return firstUnrated?.id || meals[0]?.id;
   }, [meals, currentSlot, mine, pending]);
 
+  const userInitial = (email?.[0] || session?.user.email?.[0] || 'U').toUpperCase();
+
   const top = (
     <View style={s.topContainer}>
       <View style={s.actions}>
         <Pressable
-          style={s.pillGhost}
+          style={[s.pillGhost, { backgroundColor: colors.surfaceSubtle }]}
           onPress={() => router.push('/feedback')}
           hitSlop={6}
         >
-          <Text style={s.pillGhostText}>💬 Feedback</Text>
+          <Text style={[s.pillGhostText, { color: colors.textSecondary }]}>💬 Send Feedback</Text>
         </Pressable>
         <Pressable
-          style={s.pillGhost}
-          onPress={() => sendTestReminder('lunch')}
+          style={[s.pillGhost, { backgroundColor: colors.surfaceSubtle }]}
+          onPress={() => router.push('/voting')}
           hitSlop={6}
         >
-          <Text style={s.pillGhostText}>🔔 Test reminder</Text>
+          <Text style={[s.pillGhostText, { color: colors.textSecondary }]}>🗳️ Weekly Vote</Text>
         </Pressable>
       </View>
 
+      {/* Weekly Menu Vote Banner */}
+      <Pressable
+        style={[s.pollBannerCard, { backgroundColor: colors.surface, borderColor: colors.primary }]}
+        onPress={() =>
+          router.push(
+            activePoll
+              ? { pathname: '/voting', params: { pollId: activePoll.id } }
+              : { pathname: '/voting' }
+          )
+        }
+      >
+        <View style={GLOBAL_STYLES.rowBetween}>
+          <View style={{ flex: 1, marginRight: SPACING.sm }}>
+            <Text style={s.pollBadgeText}>🗳️ WEEKLY MENU VOTE</Text>
+            <Text style={[TYPOGRAPHY.h3, { color: colors.textMain }]} numberOfLines={1}>
+              {activePoll ? activePoll.title : "Sunday's Special Feast"}
+            </Text>
+            <Text style={[s.pollClosesText, { color: colors.textMuted }]}>
+              {activePoll ? `Closes ${activePoll.closes_at}` : 'Vote for your favorite dishes'}
+            </Text>
+          </View>
+          <View style={s.voteNowBtn}>
+            <Text style={s.voteNowBtnText}>Vote →</Text>
+          </View>
+        </View>
+      </Pressable>
+
       {pendingCount > 0 && (
-        <View style={s.banner}>
-          <Text style={s.bannerText}>
+        <View style={[s.banner, { backgroundColor: colors.primaryLight }]}>
+          <Text style={[s.bannerText, { color: colors.primary }]}>
             ⏳ {pendingCount} rating{pendingCount > 1 ? 's' : ''} saved offline. Will sync automatically.
           </Text>
         </View>
       )}
 
       {meals.length > 0 && (
-        <Text style={s.sectionHeader}>TODAY'S SCHEDULE</Text>
+        <Text style={[s.sectionHeader, { color: colors.textMuted }]}>TODAY'S SCHEDULE</Text>
       )}
     </View>
   );
 
   return (
-    <View style={s.container}>
+    <View style={[s.container, { backgroundColor: colors.background }]}>
       <Header
         title="Today's Mess"
-        subtitle={`${greet} · ${date}`}
+        subtitle={headerSubtitle}
         right={
           <Pressable
-            style={s.signout}
-            onPress={() => supabase.auth.signOut()}
+            style={[s.avatarBtn, { backgroundColor: colors.primaryLight, borderColor: colors.primary }]}
+            onPress={() => router.push('/profile')}
             hitSlop={8}
           >
-            <Text style={s.signoutText}>Sign out</Text>
+            <Text style={[s.avatarBtnText, { color: colors.primary }]}>{userInitial}</Text>
           </Pressable>
         }
       />
 
       {loading ? (
-        <View style={s.center}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-        </View>
+        <TodayScreenSkeleton />
       ) : (
         <FlatList
           style={s.list}
@@ -187,12 +246,12 @@ export default function Today() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor={COLORS.primary}
+              tintColor={colors.primary}
             />
           }
           ListHeaderComponent={top}
           ListEmptyComponent={
-            <Text style={s.empty}>
+            <Text style={[s.empty, { color: colors.textMuted }]}>
               {error ? `Couldn't load meals:\n${error}\n\nPull down to retry.` : 'No meals scheduled for today.'}
             </Text>
           }
@@ -218,20 +277,23 @@ export default function Today() {
                     <VegDot isVeg={!isNonVeg} style={{ marginRight: SPACING.sm }} />
                     <View style={{ flex: 1 }}>
                       <Text
-                        style={isActive ? TYPOGRAPHY.h2 : TYPOGRAPHY.h3}
+                        style={[
+                          isActive ? TYPOGRAPHY.h2 : TYPOGRAPHY.h3,
+                          { color: colors.textMain },
+                        ]}
                         numberOfLines={1}
                       >
                         {mainDish}
                       </Text>
-                      <Text style={s.mealMeta}>
+                      <Text style={[s.mealMeta, { color: colors.textMuted }]}>
                         {EMOJI[item.meal_type]} {mealTitle} · {TIMINGS[item.meal_type] || 'Standard timings'}
                       </Text>
                     </View>
                   </View>
 
                   {sc && sc.avg_stars > 0 ? (
-                    <View style={s.scoreChip}>
-                      <Text style={s.scoreChipText}>
+                    <View style={[s.scoreChip, { backgroundColor: colors.surfaceSubtle }]}>
+                      <Text style={[s.scoreChipText, { color: colors.textSecondary }]}>
                         ★ {Number(sc.avg_stars).toFixed(1)}
                       </Text>
                     </View>
@@ -240,7 +302,7 @@ export default function Today() {
 
                 {/* Secondary items list */}
                 {otherItems.length > 0 ? (
-                  <Text style={s.menuDetails} numberOfLines={2}>
+                  <Text style={[s.menuDetails, { color: colors.textSecondary }]} numberOfLines={2}>
                     {otherItems.join(' • ')}
                   </Text>
                 ) : null}
@@ -248,8 +310,8 @@ export default function Today() {
                 {/* CTA / status row */}
                 <View style={s.ctaContainer}>
                   {my ? (
-                    <View style={GLOBAL_STYLES.successBadge}>
-                      <Text style={GLOBAL_STYLES.successBadgeText}>
+                    <View style={[GLOBAL_STYLES.successBadge, { backgroundColor: isDark ? '#064E3B' : '#DCFCE7' }]}>
+                      <Text style={[GLOBAL_STYLES.successBadgeText, { color: colors.success }]}>
                         {my.skipped
                           ? 'Marked as skipped ✓'
                           : `Rated ${'★'.repeat(my.stars ?? 0)} ✓`}
@@ -314,6 +376,52 @@ const s = StyleSheet.create({
   pillGhostText: {
     color: COLORS.textSecondary,
     fontWeight: '600',
+    fontSize: 13,
+  },
+  avatarBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+  },
+  avatarBtnText: {
+    color: COLORS.primary,
+    fontWeight: '800',
+    fontSize: 14,
+  },
+  pollBannerCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
+    borderWidth: 1.5,
+    borderColor: COLORS.primary,
+  },
+  pollBadgeText: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.primary,
+    fontWeight: '700',
+    marginBottom: 2,
+    letterSpacing: 0.5,
+  },
+  pollClosesText: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textMuted,
+    marginTop: 2,
+  },
+  voteNowBtn: {
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.full,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 8,
+  },
+  voteNowBtnText: {
+    color: COLORS.textInverse,
+    fontWeight: '700',
     fontSize: 13,
   },
   signout: {

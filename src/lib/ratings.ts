@@ -11,6 +11,17 @@ export type QueuedRating = {
   tags: string[];
   skipped: boolean;
   photo_url?: string | null;
+  comment?: string | null;
+};
+
+export type MealComment = {
+  rating_id: string;
+  meal_id: string;
+  meal_date: string;
+  meal_type: string;
+  rating: number;
+  comment: string;
+  created_at: string;
 };
 
 export async function getQueue(): Promise<QueuedRating[]> {
@@ -64,4 +75,35 @@ export async function flushQueue(userId: string): Promise<number> {
   } finally {
     flushing = false;
   }
+}
+
+/** Fetches recent comments for the admin dashboard */
+export async function getRecentMealComments(limit = 15): Promise<MealComment[]> {
+  try {
+    const { data, error } = await supabase.rpc('get_recent_meal_comments', { limit_count: limit });
+    if (!error && Array.isArray(data)) return data as MealComment[];
+
+    // Fallback direct query if RPC is pending migration
+    const { data: fallback, error: fbErr } = await supabase
+      .from('ratings')
+      .select('id, meal_id, stars, comment, created_at, meals(meal_date, meal_type)')
+      .not('comment', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (!fbErr && fallback) {
+      return fallback.map((f: any) => ({
+        rating_id: f.id,
+        meal_id: f.meal_id,
+        meal_date: f.meals?.meal_date ?? '',
+        meal_type: f.meals?.meal_type ?? '',
+        rating: f.stars ?? 0,
+        comment: f.comment ?? '',
+        created_at: f.created_at ?? '',
+      }));
+    }
+  } catch {
+    // Fail gracefully
+  }
+  return [];
 }

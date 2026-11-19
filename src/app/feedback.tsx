@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { BackLink, Card, Header, PrimaryButton } from '../components/ui';
 import { supabase } from '../lib/supabase';
+import { useTheme } from '../theme/ThemeContext';
 import {
   COLORS,
   RADIUS,
@@ -28,6 +29,7 @@ const KINDS = [
 
 export default function Feedback() {
   const router = useRouter();
+  const { colors } = useTheme();
   const [kind, setKind] = useState('idea');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
@@ -49,7 +51,7 @@ export default function Feedback() {
 
   return (
     <KeyboardAvoidingView
-      style={s.screen}
+      style={[s.screen, { backgroundColor: colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <Header
@@ -64,7 +66,7 @@ export default function Feedback() {
         showsVerticalScrollIndicator={false}
       >
         <Card variant="bordered">
-          <Text style={s.label}>CATEGORY</Text>
+          <Text style={[s.label, { color: colors.textMuted }]}>CATEGORY</Text>
           <View style={s.kinds}>
             {KINDS.map((k) => {
               const isSelected = kind === k.id;
@@ -74,13 +76,17 @@ export default function Feedback() {
                   onPress={() => setKind(k.id)}
                   style={[
                     s.kindPill,
-                    isSelected ? s.kindPillSelected : s.kindPillUnselected,
+                    isSelected
+                      ? [s.kindPillSelected, { backgroundColor: colors.primary, borderColor: colors.primary }]
+                      : [s.kindPillUnselected, { backgroundColor: colors.surfaceSubtle, borderColor: colors.border }],
                   ]}
                 >
                   <Text
                     style={[
                       s.kindText,
-                      isSelected ? s.kindTextSelected : s.kindTextUnselected,
+                      isSelected
+                        ? [s.kindTextSelected, { color: colors.textInverse }]
+                        : [s.kindTextUnselected, { color: colors.textSecondary }],
                     ]}
                   >
                     {k.label}
@@ -90,11 +96,11 @@ export default function Feedback() {
             })}
           </View>
 
-          <Text style={[s.label, { marginTop: SPACING.lg }]}>MESSAGE</Text>
+          <Text style={[s.label, { color: colors.textMuted, marginTop: SPACING.lg }]}>MESSAGE</Text>
           <TextInput
-            style={s.input}
+            style={[s.input, { backgroundColor: colors.surfaceSubtle, borderColor: colors.border, color: colors.textMain }]}
             placeholder="What's on your mind?"
-            placeholderTextColor={COLORS.textMuted}
+            placeholderTextColor={colors.textMuted}
             multiline
             maxLength={1000}
             value={message}
