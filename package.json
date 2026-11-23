@@ -40,6 +40,8 @@
   },
   "devDependencies": {
     "@react-native-community/cli": "^18.0.1",
+    "eslint": "^9.39.5",
+    "eslint-config-expo": "^58.0.4",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -48,7 +50,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "seed": "node ./scripts/seed-demo-week.js"
   },
   "private": true
 }

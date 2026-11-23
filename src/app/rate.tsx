@@ -2,7 +2,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { decode } from 'base64-arraybuffer';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Alert,
   Animated,
@@ -44,7 +44,7 @@ function StarItem({
   onPress: () => void;
 }) {
   const { colors } = useTheme();
-  const scale = useRef(new Animated.Value(1)).current;
+  const [scale] = useState(() => new Animated.Value(1));
 
   const handlePress = () => {
     if (disabled) return;
@@ -73,8 +73,16 @@ function StarItem({
 export default function Rate() {
   const { mealId, mealType } = useLocalSearchParams<{ mealId: string; mealType: string }>();
   const router = useRouter();
-  const { session } = useAuth();
+  const { session, role } = useAuth();
   const { isDark, colors } = useTheme();
+
+  useEffect(() => {
+    if (role === 'admin') {
+      Alert.alert('Admin Access', 'Admins cannot submit meal ratings.');
+      router.replace('/');
+    }
+  }, [role, router]);
+
   const [stars, setStars] = useState(0);
   const [tags, setTags] = useState<string[]>([]);
   const [comment, setComment] = useState('');
@@ -88,17 +96,46 @@ export default function Rate() {
     setTags((p) => (p.includes(t) ? p.filter((x) => x !== t) : [...p, t]));
   };
 
-  const takePhoto = async () => {
+  const pickPhoto = async (fromCamera: boolean) => {
     haptic.light();
-    const perm = await ImagePicker.requestCameraPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert('Camera permission needed', 'Allow camera access to attach a plate photo.');
-      return;
+    if (fromCamera) {
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Camera permission needed', 'Allow camera access to attach a plate photo.');
+        return;
+      }
+      const res = await ImagePicker.launchCameraAsync({ quality: 0.4, base64: true });
+      if (!res.canceled && res.assets && res.assets.length > 0) {
+        setPhoto({ uri: res.assets[0].uri, base64: res.assets[0].base64 ?? '' });
+      }
+    } else {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Gallery permission needed', 'Allow photo library access to select a plate photo.');
+        return;
+      }
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 0.4,
+        base64: true,
+      });
+      if (!res.canceled && res.assets && res.assets.length > 0) {
+        setPhoto({ uri: res.assets[0].uri, base64: res.assets[0].base64 ?? '' });
+      }
     }
-    const res = await ImagePicker.launchCameraAsync({ quality: 0.4, base64: true });
-    if (!res.canceled) {
-      setPhoto({ uri: res.assets[0].uri, base64: res.assets[0].base64 ?? '' });
-    }
+  };
+
+  const promptPhotoChoice = () => {
+    haptic.selection();
+    Alert.alert(
+      'Add Plate Photo',
+      'Take a fresh photo or choose an existing picture from your gallery:',
+      [
+        { text: '📷 Take Photo', onPress: () => pickPhoto(true) },
+        { text: '🖼️ Choose from Gallery', onPress: () => pickPhoto(false) },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
   };
 
   const submit = async () => {
@@ -121,7 +158,11 @@ export default function Rate() {
           const { error: upErr } = await supabase.storage
             .from('plate-photos')
             .upload(path, decode(photo.base64), { contentType: 'image/jpeg' });
-          if (!upErr) photoPath = path;
+          if (!upErr) {
+            photoPath = path;
+          } else {
+            console.warn('Plate photo upload warning:', upErr.message);
+          }
         }
       }
 
@@ -136,8 +177,17 @@ export default function Rate() {
       });
 
       haptic.success();
-      setDone(res.queued ? 'queued' : 'sent');
-      setTimeout(() => router.back(), 1400);
+      if (res.queued && photo) {
+        Alert.alert(
+          'Rating saved offline',
+          'Your rating was saved and will sync when you reconnect. The photo could not be saved offline and will not be uploaded.',
+          [{ text: 'OK', onPress: () => router.back() }]
+        );
+        setDone('queued');
+      } else {
+        setDone(res.queued ? 'queued' : 'sent');
+        setTimeout(() => router.back(), 1400);
+      }
     } catch (e: any) {
       haptic.warning();
       if (e?.message === 'ALREADY_RATED') {
@@ -151,6 +201,8 @@ export default function Rate() {
       setBusy(false);
     }
   };
+
+  if (role === 'admin') return null;
 
   if (done) {
     return (
@@ -168,7 +220,7 @@ export default function Rate() {
         </Text>
         {done === 'queued' && (
           <Text style={[TYPOGRAPHY.body, { color: colors.textMuted, marginTop: SPACING.xs, textAlign: 'center' }]}>
-            We'll send it automatically when you're back online.
+            We&apos;ll send it automatically when you&apos;re back online.
           </Text>
         )}
       </View>
@@ -289,7 +341,7 @@ export default function Rate() {
           ) : (
             <Pressable
               style={[s.photoBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
-              onPress={takePhoto}
+              onPress={promptPhotoChoice}
             >
               <Text style={[s.photoBtnText, { color: colors.textMuted }]}>📷  Add a plate photo (optional)</Text>
             </Pressable>

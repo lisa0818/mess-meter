@@ -21,6 +21,7 @@ export type MealComment = {
   meal_type: string;
   rating: number;
   comment: string;
+  photo_url?: string | null;
   created_at: string;
 };
 
@@ -77,6 +78,14 @@ export async function flushQueue(userId: string): Promise<number> {
   }
 }
 
+/** Returns the public CDN URL for an uploaded plate photo */
+export function getPlatePhotoUrl(path: string | null | undefined): string | null {
+  if (!path) return null;
+  if (path.startsWith('http://') || path.startsWith('https://')) return path;
+  const { data } = supabase.storage.from('plate-photos').getPublicUrl(path);
+  return data?.publicUrl || null;
+}
+
 /** Fetches recent comments for the admin dashboard */
 export async function getRecentMealComments(limit = 15): Promise<MealComment[]> {
   try {
@@ -86,8 +95,8 @@ export async function getRecentMealComments(limit = 15): Promise<MealComment[]> 
     // Fallback direct query if RPC is pending migration
     const { data: fallback, error: fbErr } = await supabase
       .from('ratings')
-      .select('id, meal_id, stars, comment, created_at, meals(meal_date, meal_type)')
-      .not('comment', 'is', null)
+      .select('id, meal_id, stars, comment, photo_url, created_at, meals(meal_date, meal_type)')
+      .or('comment.neq.null,photo_url.neq.null')
       .order('created_at', { ascending: false })
       .limit(limit);
 
@@ -99,6 +108,7 @@ export async function getRecentMealComments(limit = 15): Promise<MealComment[]> 
         meal_type: f.meals?.meal_type ?? '',
         rating: f.stars ?? 0,
         comment: f.comment ?? '',
+        photo_url: f.photo_url ?? null,
         created_at: f.created_at ?? '',
       }));
     }

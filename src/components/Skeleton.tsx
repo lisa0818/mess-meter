@@ -1,8 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Animated, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import { Card } from './ui';
 import { useTheme } from '../theme/ThemeContext';
-import { COLORS, GLOBAL_STYLES, RADIUS, SPACING } from '../theme/designSystem';
+import { GLOBAL_STYLES, RADIUS, SPACING } from '../theme/designSystem';
 
 export function SkeletonBox({
   width = '100%',
@@ -16,7 +16,7 @@ export function SkeletonBox({
   style?: StyleProp<ViewStyle>;
 }) {
   const { colors } = useTheme();
-  const opacity = useRef(new Animated.Value(0.35)).current;
+  const [opacity] = useState(() => new Animated.Value(0.35));
 
   useEffect(() => {
     const animation = Animated.loop(

@@ -1,9 +1,8 @@
 import { Tabs } from 'expo-router';
-import { Platform, View } from 'react-native';
+import { Platform } from 'react-native';
 import Svg, { Circle, Line, Path, Polyline, Rect } from 'react-native-svg';
 import { useAuth } from '../../lib/auth';
 import { useTheme } from '../../theme/ThemeContext';
-import { COLORS } from '../../theme/designSystem';
 
 function TabIcon({
   name,
@@ -175,7 +174,8 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, focused }) => (
             <TabIcon name="vote" color={color} focused={focused} />
           ),
-          tabBarButton: isAdmin ? () => null : undefined,
+          href: isAdmin ? null : undefined,
+          tabBarItemStyle: isAdmin ? { display: 'none' } : undefined,
         }}
       />
 
@@ -187,7 +187,8 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, focused }) => (
             <TabIcon name="menu" color={color} focused={focused} />
           ),
-          tabBarButton: isAdmin ? undefined : () => null,
+          href: isAdmin ? undefined : null,
+          tabBarItemStyle: isAdmin ? undefined : { display: 'none' },
         }}
       />
 
@@ -199,7 +200,8 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, focused }) => (
             <TabIcon name="admin" color={color} focused={focused} />
           ),
-          tabBarButton: isAdmin ? undefined : () => null,
+          href: isAdmin ? undefined : null,
+          tabBarItemStyle: isAdmin ? undefined : { display: 'none' },
         }}
       />
 

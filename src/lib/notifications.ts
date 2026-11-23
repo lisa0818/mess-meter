@@ -1,10 +1,8 @@
-import Constants, { ExecutionEnvironment } from 'expo-constants';
+import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { supabase } from './supabase';
 
 type Notif = typeof import('expo-notifications');
-
-const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
 let N: Notif | null = null;
 let tried = false;
@@ -14,6 +12,7 @@ function load(): Notif | null {
   tried = true;
   if (Platform.OS === 'web') return null;
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     N = require('expo-notifications') as Notif;
     N.setNotificationHandler({
       handleNotification: async () => ({

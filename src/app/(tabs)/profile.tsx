@@ -33,7 +33,7 @@ import {
 export default function Profile() {
   const router = useRouter();
   const { session, email, hostelName, role, refreshProfile } = useAuth();
-  const { themeMode, setThemeMode, isDark, colors } = useTheme();
+  const { themeMode, setThemeMode, colors } = useTheme();
   const [remindersEnabled, setRemindersEnabled] = useState(true);
   const [changingPassword, setChangingPassword] = useState(false);
   const [newPassword, setNewPassword] = useState('');

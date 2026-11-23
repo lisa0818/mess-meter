@@ -1,7 +1,6 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   RefreshControl,
   ScrollView,
@@ -65,7 +64,8 @@ export default function WeeklyVoting() {
   const router = useRouter();
   const { isDark, colors } = useTheme();
   const params = useLocalSearchParams<{ pollId?: string }>();
-  const { session, hostelId } = useAuth();
+  const { session, hostelId, role } = useAuth();
+  const isAdmin = role === 'admin';
   const uid = session?.user.id;
 
   const [activePoll, setActivePoll] = useState<Poll | null>(null);
@@ -134,13 +134,13 @@ export default function WeeklyVoting() {
   const totalVotes = options.reduce((sum, o) => sum + o.votes, 0);
 
   const handleSelect = (id: string) => {
-    if (hasVoted) return;
+    if (hasVoted || isAdmin) return;
     haptic.selection();
     setSelectedId(id);
   };
 
   const handleConfirmVote = async () => {
-    if (!selectedId || hasVoted) return;
+    if (!selectedId || hasVoted || isAdmin) return;
     haptic.medium();
     setSubmitting(true);
 
@@ -171,7 +171,9 @@ export default function WeeklyVoting() {
     }
   };
 
-  const subtitle = activePoll
+  const subtitle = isAdmin
+    ? `Admin View · ${activePoll ? activePoll.title : "Sunday's Special"} · ${totalVotes} student votes`
+    : activePoll
     ? `Vote for ${activePoll.title} · Closes ${activePoll.closes_at}`
     : "Vote for Sunday's Special Dinner · Closes Friday 8 PM";
 
@@ -197,7 +199,19 @@ export default function WeeklyVoting() {
             />
           }
         >
-          <Text style={[s.sectionHeader, { color: colors.textMuted }]}>SELECT YOUR PREFERRED MENU</Text>
+          <Text style={[s.sectionHeader, { color: colors.textMuted }]}>
+            {isAdmin ? 'LIVE STUDENT CHOICES' : 'SELECT YOUR PREFERRED MENU'}
+          </Text>
+
+          {isAdmin && (
+            <View style={{ marginBottom: SPACING.md }}>
+              <View style={[GLOBAL_STYLES.badge, { backgroundColor: colors.surfaceSubtle, paddingVertical: SPACING.xs + 2, paddingHorizontal: SPACING.md }]}>
+                <Text style={[TYPOGRAPHY.caption, { color: colors.primary, fontWeight: '700' }]}>
+                  👑 Admin View · Live student votes tally ({totalVotes} total votes)
+                </Text>
+              </View>
+            </View>
+          )}
 
           <View style={s.pollList}>
             {options.map((opt) => {
@@ -211,15 +225,15 @@ export default function WeeklyVoting() {
                   subtitle={opt.subtitle}
                   isVeg={opt.is_veg}
                   selected={isSelected}
-                  votesPercentage={hasVoted ? percentage : undefined}
+                  votesPercentage={isAdmin || hasVoted ? percentage : undefined}
                   onSelect={() => handleSelect(opt.option_id)}
-                  disabled={hasVoted}
+                  disabled={isAdmin || hasVoted}
                 />
               );
             })}
           </View>
 
-          {hasVoted && (
+          {!isAdmin && hasVoted && (
             <View style={s.votedBadgeContainer}>
               <View style={[GLOBAL_STYLES.successBadge, { backgroundColor: isDark ? '#064E3B' : '#DCFCE7' }]}>
                 <Text style={[GLOBAL_STYLES.successBadgeText, { color: colors.success }]}>
@@ -231,8 +245,8 @@ export default function WeeklyVoting() {
         </ScrollView>
       )}
 
-      {/* Sticky Bottom CTA */}
-      {!hasVoted && !loading && (
+      {/* Sticky Bottom CTA for students only */}
+      {!isAdmin && !hasVoted && !loading && (
         <View style={[GLOBAL_STYLES.stickyBottomCTA, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
           <PrimaryButton
             label={selectedId ? 'Confirm Weekly Vote' : 'Select an Option Above'}

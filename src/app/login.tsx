@@ -15,7 +15,6 @@ import { supabase } from '../lib/supabase';
 import { useTheme } from '../theme/ThemeContext';
 import {
   COLORS,
-  GLOBAL_STYLES,
   RADIUS,
   SPACING,
   TYPOGRAPHY,
@@ -38,12 +37,23 @@ export default function Login() {
     }
     setBusy(true);
     const creds = { email: email.trim(), password };
-    const { error } =
-      mode === 'in'
-        ? await supabase.auth.signInWithPassword(creds)
-        : await supabase.auth.signUp(creds);
-    setBusy(false);
-    if (error) Alert.alert('Could not continue', error.message);
+    if (mode === 'in') {
+      const { error } = await supabase.auth.signInWithPassword(creds);
+      setBusy(false);
+      if (error) Alert.alert('Could not continue', error.message);
+    } else {
+      const { data, error } = await supabase.auth.signUp(creds);
+      setBusy(false);
+      if (error) {
+        Alert.alert('Could not continue', error.message);
+      } else if (!data.session) {
+        Alert.alert(
+          'Check your email ✉️',
+          `We sent a verification link to ${email.trim()}. Open it to activate your account, then come back and sign in.`
+        );
+        setMode('in');
+      }
+    }
   };
 
   return (

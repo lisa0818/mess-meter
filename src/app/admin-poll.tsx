@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -55,6 +55,12 @@ export default function AdminPoll() {
   const { session, hostelId, role } = useAuth();
   const { colors } = useTheme();
   const uid = session?.user.id;
+
+  useEffect(() => {
+    if (role !== 'admin') {
+      router.replace('/');
+    }
+  }, [role, router]);
 
   const defaults = getDefaultDates();
   const [title, setTitle] = useState("Sunday's Special Feast");
@@ -157,6 +163,8 @@ export default function AdminPoll() {
       setBusy(false);
     }
   };
+
+  if (role !== 'admin') return null;
 
   return (
     <KeyboardAvoidingView

@@ -1,7 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import React, { createContext, ReactNode, useContext, useEffect, useState, useSyncExternalStore } from 'react';
 import { Platform, useColorScheme } from 'react-native';
 import { ColorPalette, COLORS_DARK, COLORS_LIGHT } from './designSystem';
+
+const emptySubscribe = () => () => {};
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 
@@ -40,10 +42,9 @@ const ThemeContext = createContext<ThemeContextType>({
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const systemScheme = useColorScheme();
   const [themeMode, setThemeModeState] = useState<ThemeMode>('system');
-  const [mounted, setMounted] = useState(false);
+  const isClient = useSyncExternalStore(emptySubscribe, () => true, () => false);
 
   useEffect(() => {
-    setMounted(true);
     AsyncStorage.getItem(THEME_STORAGE_KEY).then((stored) => {
       if (stored === 'light' || stored === 'dark' || stored === 'system') {
         setThemeModeState(stored);
@@ -63,7 +64,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // On Web with SSR, prevent hydration mismatch by rendering baseline on first pass,
   // then updating after mount. On native, render theme immediately.
   const isDark =
-    Platform.OS === 'web' && !mounted
+    Platform.OS === 'web' && !isClient
       ? false
       : themeMode === 'dark' || (themeMode === 'system' && systemScheme === 'dark');
 

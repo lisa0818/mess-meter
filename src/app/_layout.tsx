@@ -78,7 +78,7 @@ function Gate() {
       }, 0);
       return () => clearTimeout(timer);
     }
-  }, [rootNavigationState?.key, session, hostelId, loading, onboardingChecked, seenOnboarding, segments]);
+  }, [rootNavigationState?.key, session, hostelId, loading, onboardingChecked, seenOnboarding, segments, router]);
 
   useEffect(() => {
     if (uid && hostelId) setupReminders().catch(() => {});
@@ -125,7 +125,7 @@ function Gate() {
       if (done) return;
       router.push({ pathname: '/rate', params: { mealId: meal.id, mealType: meal.meal_type } });
     })();
-  }, [lastResponse, uid, hostelId]);
+  }, [lastResponse, uid, hostelId, router]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>

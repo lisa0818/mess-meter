@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -16,7 +16,7 @@ import {
 import { Card, Header, PrimaryButton } from '../../components/ui';
 import { useAuth } from '../../lib/auth';
 import { useTheme } from '../../theme/ThemeContext';
-import { copyDayMenu, deleteMeal, getMealsForDate, Meal, upsertMeal } from '../../lib/meals';
+import { copyDayMenu, deleteMeal, getMealsForDate, Meal, seedDemoWeek, upsertMeal } from '../../lib/meals';
 import {
   COLORS,
   GLOBAL_STYLES,
@@ -39,8 +39,15 @@ const fmtDate = (d: Date) => {
 
 export default function MenuManagement() {
   const router = useRouter();
-  const { hostelId } = useAuth();
-  const { isDark, colors } = useTheme();
+  const { hostelId, role } = useAuth();
+  const { colors } = useTheme();
+
+  useEffect(() => {
+    if (role !== 'admin') {
+      router.replace('/');
+    }
+  }, [role, router]);
+
   const [selectedDate, setSelectedDate] = useState<string>(() => fmtDate(new Date()));
   const [meals, setMeals] = useState<Meal[]>([]);
   const [loading, setLoading] = useState(true);
@@ -178,6 +185,33 @@ export default function MenuManagement() {
     );
   };
 
+  const handleSeedDemoWeek = () => {
+    Alert.alert(
+      'Set up demo week',
+      'This will populate 7 continuous days of breakfast, lunch, snacks, and dinner around today for your demo.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Load Demo Menu',
+          onPress: async () => {
+            try {
+              setLoading(true);
+              const count = await seedDemoWeek(hostelId);
+              await loadMeals();
+              Alert.alert('Demo Week Ready 🎉', `Scheduled ${count} meals across the week.`);
+            } catch (e: any) {
+              Alert.alert('Seed failed', e?.message || 'Could not load demo meals.');
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  if (role !== 'admin') return null;
+
   return (
     <KeyboardAvoidingView
       style={[s.screen, { backgroundColor: colors.background }]}
@@ -259,14 +293,21 @@ export default function MenuManagement() {
             onPress={handleCopyYesterday}
             hitSlop={6}
           >
-            <Text style={[s.quickActionText, { color: colors.textSecondary }]}>📋 Copy Previous Day</Text>
+            <Text style={[s.quickActionText, { color: colors.textSecondary }]}>📋 Copy Previous</Text>
           </Pressable>
           <Pressable
             style={[s.quickActionBtn, { backgroundColor: colors.surfaceSubtle, borderColor: colors.border }]}
             onPress={() => router.push({ pathname: '/admin-poll', params: { date: selectedDate } })}
             hitSlop={6}
           >
-            <Text style={[s.quickActionText, { color: colors.textSecondary }]}>🗳️ Create Poll for Date</Text>
+            <Text style={[s.quickActionText, { color: colors.textSecondary }]}>🗳️ Create Poll</Text>
+          </Pressable>
+          <Pressable
+            style={[s.quickActionBtn, { backgroundColor: colors.surfaceSubtle, borderColor: colors.primary }]}
+            onPress={handleSeedDemoWeek}
+            hitSlop={6}
+          >
+            <Text style={[s.quickActionText, { color: colors.primary, fontWeight: '700' }]}>✨ Demo Week</Text>
           </Pressable>
         </View>
 
@@ -313,7 +354,7 @@ export default function MenuManagement() {
                 {isEditing ? (
                   <View style={[s.editContainer, { borderTopColor: colors.surfaceSubtle }]}>
                     <Text style={[s.inputHint, { color: colors.textMuted }]}>
-                      Enter dishes separated by commas (e.g. "Dal Makhani, Butter Roti, Gulab Jamun"):
+                      Enter dishes separated by commas (e.g. &quot;Dal Makhani, Butter Roti, Gulab Jamun&quot;):
                     </Text>
                     <TextInput
                       style={[s.inputBox, { backgroundColor: colors.surfaceSubtle, borderColor: colors.border, color: colors.textMain }]}

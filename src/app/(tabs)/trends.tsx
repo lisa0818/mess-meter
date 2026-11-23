@@ -1,7 +1,6 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
-  ActivityIndicator,
   Dimensions,
   RefreshControl,
   ScrollView,
@@ -35,11 +34,12 @@ type Row = {
 };
 
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
-const ratingColor = (v: number) =>
-  v >= 4 ? COLORS.success : v >= 3 ? COLORS.warning : COLORS.danger;
 
 export default function Trends() {
   const { isDark, colors } = useTheme();
+
+  const ratingColor = (v: number) =>
+    v >= 4 ? colors.success : v >= 3 ? colors.warning : colors.danger;
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -133,8 +133,8 @@ export default function Trends() {
         }
       >
         {error && (
-          <View style={s.errorBanner}>
-            <Text style={s.errorText}>Couldn't load: {error}</Text>
+          <View style={[s.errorBanner, { backgroundColor: isDark ? '#450A0A' : '#FEE2E2' }]}>
+            <Text style={[s.errorText, { color: colors.danger }]}>Couldn&apos;t load: {error}</Text>
           </View>
         )}
 
@@ -153,7 +153,7 @@ export default function Trends() {
                 {dayLabel(worst.meal_date)} · {cap(worst.meal_type)}
               </Text>
               <View style={[s.alertBadge, { backgroundColor: isDark ? '#450A0A' : '#FEE2E2' }]}>
-                <Text style={s.alertBadgeText}>
+                <Text style={[s.alertBadgeText, { color: colors.danger }]}>
                   ★ {Number(worst.avg_stars).toFixed(1)}
                 </Text>
               </View>

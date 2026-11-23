@@ -344,7 +344,7 @@ export function MealCard({
   isVeg?: boolean;
   onRate?: () => void;
 }) {
-  const { colors } = useTheme();
+  const { isDark, colors } = useTheme();
   const title = dishName || (mealType[0].toUpperCase() + mealType.slice(1));
 
   return (
@@ -364,8 +364,8 @@ export function MealCard({
         </View>
 
         {score !== undefined && score > 0 ? (
-          <View style={GLOBAL_STYLES.badge}>
-            <Text style={GLOBAL_STYLES.badgeText}>
+          <View style={[GLOBAL_STYLES.badge, { backgroundColor: colors.primaryLight }]}>
+            <Text style={[GLOBAL_STYLES.badgeText, { color: colors.primary }]}>
               ★ {score.toFixed(1)} {scoreCount ? `(${scoreCount})` : ''}
             </Text>
           </View>
@@ -385,8 +385,8 @@ export function MealCard({
       ) : null}
 
       {isRated ? (
-        <View style={GLOBAL_STYLES.successBadge}>
-          <Text style={GLOBAL_STYLES.successBadgeText}>
+        <View style={[GLOBAL_STYLES.successBadge, { backgroundColor: isDark ? '#064E3B' : '#DCFCE7' }]}>
+          <Text style={[GLOBAL_STYLES.successBadgeText, { color: colors.success }]}>
             {ratingBadgeText || 'Rated ✓'}
           </Text>
         </View>

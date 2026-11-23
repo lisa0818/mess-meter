@@ -1,7 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import {
-  ActivityIndicator,
   DeviceEventEmitter,
   FlatList,
   Pressable,
@@ -14,7 +13,6 @@ import { Card, Header, PrimaryButton, VegDot } from '../../components/ui';
 import { TodayScreenSkeleton } from '../../components/Skeleton';
 import { useAuth } from '../../lib/auth';
 import { useTheme } from '../../theme/ThemeContext';
-import { sendTestReminder } from '../../lib/notifications';
 import { getActivePolls, Poll } from '../../lib/polls';
 import { getQueue } from '../../lib/ratings';
 import { supabase } from '../../lib/supabase';
@@ -51,9 +49,11 @@ const isMealNonVeg = (items: string[]) => {
   return nonVegKeywords.some((k) => text.includes(k));
 };
 
+const emptySubscribe = () => () => {};
+
 export default function Today() {
   const router = useRouter();
-  const { session, hostelId, email } = useAuth();
+  const { session, hostelId, email, role } = useAuth();
   const { isDark, colors } = useTheme();
   const uid = session?.user.id;
   const [meals, setMeals] = useState<Meal[]>([]);
@@ -124,10 +124,7 @@ export default function Today() {
     setRefreshing(false);
   };
 
-  const [clientMounted, setClientMounted] = useState(false);
-  useEffect(() => {
-    setClientMounted(true);
-  }, []);
+  const clientMounted = useSyncExternalStore(emptySubscribe, () => true, () => false);
 
   const pendingCount = Object.keys(pending).length;
   const hr = clientMounted ? new Date().getHours() : 12;
@@ -161,20 +158,41 @@ export default function Today() {
   const top = (
     <View style={s.topContainer}>
       <View style={s.actions}>
-        <Pressable
-          style={[s.pillGhost, { backgroundColor: colors.surfaceSubtle }]}
-          onPress={() => router.push('/feedback')}
-          hitSlop={6}
-        >
-          <Text style={[s.pillGhostText, { color: colors.textSecondary }]}>💬 Send Feedback</Text>
-        </Pressable>
-        <Pressable
-          style={[s.pillGhost, { backgroundColor: colors.surfaceSubtle }]}
-          onPress={() => router.push('/voting')}
-          hitSlop={6}
-        >
-          <Text style={[s.pillGhostText, { color: colors.textSecondary }]}>🗳️ Weekly Vote</Text>
-        </Pressable>
+        {role === 'admin' ? (
+          <>
+            <Pressable
+              style={[s.pillGhost, { backgroundColor: colors.surfaceSubtle }]}
+              onPress={() => router.push('/(tabs)/admin')}
+              hitSlop={6}
+            >
+              <Text style={[s.pillGhostText, { color: colors.textSecondary }]}>📊 View Analytics</Text>
+            </Pressable>
+            <Pressable
+              style={[s.pillGhost, { backgroundColor: colors.surfaceSubtle }]}
+              onPress={() => router.push('/admin-poll')}
+              hitSlop={6}
+            >
+              <Text style={[s.pillGhostText, { color: colors.textSecondary }]}>🗳️ Create Poll</Text>
+            </Pressable>
+          </>
+        ) : (
+          <>
+            <Pressable
+              style={[s.pillGhost, { backgroundColor: colors.surfaceSubtle }]}
+              onPress={() => router.push('/feedback')}
+              hitSlop={6}
+            >
+              <Text style={[s.pillGhostText, { color: colors.textSecondary }]}>💬 Send Feedback</Text>
+            </Pressable>
+            <Pressable
+              style={[s.pillGhost, { backgroundColor: colors.surfaceSubtle }]}
+              onPress={() => router.push('/voting')}
+              hitSlop={6}
+            >
+              <Text style={[s.pillGhostText, { color: colors.textSecondary }]}>🗳️ Weekly Vote</Text>
+            </Pressable>
+          </>
+        )}
       </View>
 
       {/* Weekly Menu Vote Banner */}
@@ -184,22 +202,32 @@ export default function Today() {
           router.push(
             activePoll
               ? { pathname: '/voting', params: { pollId: activePoll.id } }
+              : role === 'admin'
+              ? { pathname: '/admin-poll' }
               : { pathname: '/voting' }
           )
         }
       >
         <View style={GLOBAL_STYLES.rowBetween}>
           <View style={{ flex: 1, marginRight: SPACING.sm }}>
-            <Text style={s.pollBadgeText}>🗳️ WEEKLY MENU VOTE</Text>
+            <Text style={s.pollBadgeText}>
+              {role === 'admin' ? '🗳️ STUDENT POLL STATUS' : '🗳️ WEEKLY MENU VOTE'}
+            </Text>
             <Text style={[TYPOGRAPHY.h3, { color: colors.textMain }]} numberOfLines={1}>
               {activePoll ? activePoll.title : "Sunday's Special Feast"}
             </Text>
             <Text style={[s.pollClosesText, { color: colors.textMuted }]}>
-              {activePoll ? `Closes ${activePoll.closes_at}` : 'Vote for your favorite dishes'}
+              {activePoll
+                ? `Closes ${activePoll.closes_at}`
+                : role === 'admin'
+                ? 'Tap to publish a student poll'
+                : 'Vote for your favorite dishes'}
             </Text>
           </View>
-          <View style={s.voteNowBtn}>
-            <Text style={s.voteNowBtnText}>Vote →</Text>
+          <View style={[s.voteNowBtn, role === 'admin' && { backgroundColor: colors.surfaceSubtle }]}>
+            <Text style={[s.voteNowBtnText, role === 'admin' && { color: colors.primary }]}>
+              {role === 'admin' ? 'Results →' : 'Vote →'}
+            </Text>
           </View>
         </View>
       </Pressable>
@@ -213,7 +241,7 @@ export default function Today() {
       )}
 
       {meals.length > 0 && (
-        <Text style={[s.sectionHeader, { color: colors.textMuted }]}>TODAY'S SCHEDULE</Text>
+        <Text style={[s.sectionHeader, { color: colors.textMuted }]}>TODAY&apos;S SCHEDULE</Text>
       )}
     </View>
   );
@@ -309,7 +337,11 @@ export default function Today() {
 
                 {/* CTA / status row */}
                 <View style={s.ctaContainer}>
-                  {my ? (
+                  {role === 'admin' ? (
+                    <Text style={[TYPOGRAPHY.caption, { color: colors.textMuted }]}>
+                      Admin View · {sc?.n ? `${sc.n} student rating${sc.n > 1 ? 's' : ''}` : 'No student ratings yet'}
+                    </Text>
+                  ) : my ? (
                     <View style={[GLOBAL_STYLES.successBadge, { backgroundColor: isDark ? '#064E3B' : '#DCFCE7' }]}>
                       <Text style={[GLOBAL_STYLES.successBadgeText, { color: colors.success }]}>
                         {my.skipped

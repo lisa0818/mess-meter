@@ -1,10 +1,9 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import { PrimaryButton } from './ui';
 import { useTheme } from '../theme/ThemeContext';
 import {
   COLORS,
-  GLOBAL_STYLES,
   RADIUS,
   SPACING,
   TYPOGRAPHY,
